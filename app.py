@@ -519,23 +519,38 @@ class CameraNode:
 
 @st.cache_resource(show_spinner="Loading YOLOv8n detection model...")
 def load_yolo():
+    import torch
     from ultralytics import YOLO
     model = YOLO("yolov8n-pose.pt")
-    model.to('cuda')
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    try:
+        model.to(device)
+    except Exception:
+        pass
     return model
 
 @st.cache_resource(show_spinner="Loading EasyOCR (ANPR engine)...")
 def load_ocr():
+    import torch
     import easyocr
-    return easyocr.Reader(["en"], gpu=True)
+    use_gpu = torch.cuda.is_available()
+    try:
+        return easyocr.Reader(["en"], gpu=use_gpu)
+    except Exception:
+        return easyocr.Reader(["en"], gpu=False)
 
 @st.cache_resource(show_spinner="Loading YOLOv8 plate model...")
 def load_plate_model():
+    import torch
     from ultralytics import YOLO
     path = "plate_yolo.pt"
     if os.path.exists(path):
         model = YOLO(path)
-        model.to('cuda')
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        try:
+            model.to(device)
+        except Exception:
+            pass
         return model
     return None
 
