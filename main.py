@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import os
 import sys
+import re
 import time
 import math
+import random
 import logging
 import threading
 from collections import deque
@@ -33,6 +35,11 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 import easyocr
+try:
+    from pyngrok import ngrok
+    PYNGROK_AVAILABLE = True
+except ImportError:
+    PYNGROK_AVAILABLE = False
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
@@ -395,19 +402,22 @@ class IBVAPSurveillanceEngine:
         except Exception as e:
             logger.warning(f"EasyOCR fallback notice: {e}")
 
-        # 5. Load YuNet Face Detector
+        # 5. Load YuNet Face Detector (increased confidence threshold to suppress artifacts)
         self.face_cascade = None
         face_path = os.path.join(BASE_DIR, "face_detection_yunet.onnx")
         if os.path.exists(face_path):
             try:
                 self.face_cascade = cv2.FaceDetectorYN.create(
                     face_path, "", (320, 320),
-                    score_threshold=0.60,
+                    score_threshold=0.75,
                     nms_threshold=0.30
                 )
-                logger.info("YuNet Face Detector initialized.")
+                logger.info("YuNet Face Detector initialized with score_threshold=0.75.")
             except Exception as e:
                 logger.warning(f"YuNet Face Detector notice: {e}")
+
+        # Face detection persistence (debounce tracking per camera feed)
+        self.face_persistence: Dict[str, Dict[str, Any]] = {}
 
         # 6. Initialize Per-Camera BLA Engines
         self.bla_engines: Dict[str, ActivityEngine] = {
@@ -416,8 +426,10 @@ class IBVAPSurveillanceEngine:
             "CAM_3": ActivityEngine(camera_id="CAM_3"),
         }
 
-        # Telemetry Cache
+        # Telemetry Cache & ANPR Registry
         self.telemetry_lock = threading.Lock()
+        self.recent_plates: deque = deque(maxlen=60)
+        self._last_plate_seen: Dict[str, float] = {}
         self.latest_telemetry: Dict[str, Any] = {
             "fps": 0.0,
             "latency_ms": 0.0,
@@ -428,6 +440,7 @@ class IBVAPSurveillanceEngine:
             "plates": 0,
             "breaches": 0,
             "active_alerts": [],
+            "recent_plates": [],
             "timestamp": time.time()
         }
 
@@ -549,6 +562,9 @@ class IBVAPSurveillanceEngine:
         # 3. Plate YOLO & EasyOCR (ANPR Pipeline)
         # ---------------------------------------------------------------------
         if enable_ocr and self.plate_model is not None:
+            detected_plate_candidates: List[Tuple[int, int, int, int, float]] = []
+
+            # 3A. Primary pass: Run Plate YOLO across frame
             with self._lock:
                 plate_results = self.plate_model.predict(
                     frame,
@@ -562,55 +578,152 @@ class IBVAPSurveillanceEngine:
                 for p_box in plate_results[0].boxes:
                     px1, py1, px2, py2 = map(int, p_box.xyxy[0].tolist())
                     p_conf = round(float(p_box.conf[0].item()), 2)
+                    detected_plate_candidates.append((px1, py1, px2, py2, p_conf))
 
-                    # Extract plate crop for EasyOCR
-                    plate_text = ""
-                    p_crop = frame[max(0, py1):min(h, py2), max(0, px1):min(w, px2)]
-                    if p_crop.size > 0 and self.ocr_engine is not None:
-                        try:
-                            # Upscale 2x for OCR precision on license plates
-                            p_crop_res = cv2.resize(p_crop, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
-                            ocr_texts = self.ocr_engine.readtext(p_crop_res, detail=0)
-                            cands = [t for t in ocr_texts if len(t) >= 3 and any(c.isalnum() for c in t)]
-                            if cands:
-                                plate_text = "".join(cands).upper().replace(" ", "")
-                            else:
-                                plate_text = "PLATE DETECTED"
-                        except Exception:
+            # 3B. Secondary pass: Check detected vehicle crops if full-frame did not catch plates
+            if not detected_plate_candidates:
+                for det in detections:
+                    if det.get("label") in VEHICLE_TYPES and det.get("conf", 0) > 0.45:
+                        vx1, vy1, vx2, vy2 = det["bbox"]
+                        crop_y1 = max(0, vy1 + int((vy2 - vy1) * 0.40))
+                        crop_y2 = min(h, vy2)
+                        crop_x1 = max(0, vx1)
+                        crop_x2 = min(w, vx2)
+                        v_crop = frame[crop_y1:crop_y2, crop_x1:crop_x2]
+                        if v_crop.size > 0 and (crop_x2 - crop_x1) > 40 and (crop_y2 - crop_y1) > 20:
+                            with self._lock:
+                                vp_results = self.plate_model.predict(
+                                    v_crop,
+                                    conf=0.15,
+                                    imgsz=320,
+                                    verbose=False,
+                                    device=self.device
+                                )
+                            if vp_results and len(vp_results) > 0 and len(vp_results[0].boxes) > 0:
+                                best_p = max(vp_results[0].boxes, key=lambda b: float(b.conf[0]))
+                                bx1, by1, bx2, by2 = map(int, best_p.xyxy[0].tolist())
+                                b_conf = round(float(best_p.conf[0].item()), 2)
+                                detected_plate_candidates.append((crop_x1 + bx1, crop_y1 + by1, crop_x1 + bx2, crop_y1 + by2, b_conf))
+
+            # 3C. OCR Character Decoding & Telemetry Registry Logging
+            for px1, py1, px2, py2, p_conf in detected_plate_candidates:
+                plate_text = ""
+                p_crop = frame[max(0, py1):min(h, py2), max(0, px1):min(w, px2)]
+                if p_crop.size > 0 and self.ocr_engine is not None:
+                    try:
+                        # Upscale small plate crops to boost character recognition
+                        crop_h, crop_w = p_crop.shape[:2]
+                        if crop_w < 140 or crop_h < 40:
+                            scale = max(1.5, 140.0 / max(crop_w, 1))
+                            p_scaled = cv2.resize(p_crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+                        else:
+                            p_scaled = p_crop
+
+                        # Grayscale and bilateral filtering for edge preservation
+                        p_gray = cv2.cvtColor(p_scaled, cv2.COLOR_BGR2GRAY)
+                        p_filtered = cv2.bilateralFilter(p_gray, d=11, sigmaColor=17, sigmaSpace=17)
+
+                        # Otsu thresholding
+                        _, p_thresh = cv2.threshold(
+                            p_filtered, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+                        )
+
+                        # Primary OCR attempt on high-contrast threshold
+                        ocr_texts = self.ocr_engine.readtext(
+                            p_thresh,
+                            detail=0,
+                            allowlist="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                        )
+                        # Fallback OCR attempt on filtered crop if thresholding produced nothing
+                        if not ocr_texts:
+                            ocr_texts = self.ocr_engine.readtext(
+                                p_filtered,
+                                detail=0,
+                                allowlist="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                            )
+
+                        cands = [re.sub(r"[^A-Z0-9]", "", t.strip().upper()) for t in ocr_texts if len(t.strip()) >= 2]
+                        cands = [t for t in cands if len(t) >= 2]
+                        if cands:
+                            plate_text = "".join(cands)
+                        else:
                             plate_text = "PLATE DETECTED"
-                    else:
+                    except Exception as e:
+                        logger.debug(f"ANPR preprocessing notice: {e}")
                         plate_text = "PLATE DETECTED"
+                else:
+                    plate_text = "PLATE DETECTED"
 
-                    detections.append({
-                        "label": "PLATE",
-                        "conf": p_conf,
-                        "bbox": [px1, py1, px2, py2],
-                        "plate": plate_text,
-                        "keypoints": None,
-                        "alert": False
-                    })
+                if plate_text and plate_text != "PLATE DETECTED":
+                    now_ts = time.time()
+                    last_t = self._last_plate_seen.get(plate_text, 0)
+                    if (now_ts - last_t) > 3.0:
+                        self._last_plate_seen[plate_text] = now_ts
+                        if len(self._last_plate_seen) > 200:
+                            self._last_plate_seen = {k: v for k, v in self._last_plate_seen.items() if now_ts - v < 60}
+
+                        # Simulated database check: status 'CLEARED' or 'FLAGGED'
+                        db_status = "FLAGGED" if (random.random() < 0.25 or hash(plate_text) % 4 == 0) else "CLEARED"
+                        with self.telemetry_lock:
+                            self.recent_plates.appendleft({
+                                "plate": plate_text,
+                                "timestamp": time.strftime("%H:%M:%S", time.localtime(now_ts)),
+                                "status": db_status,
+                                "camera_id": camera_id,
+                                "conf": p_conf,
+                                "epoch": now_ts
+                            })
+
+                detections.append({
+                    "label": "PLATE",
+                    "conf": p_conf,
+                    "bbox": [px1, py1, px2, py2],
+                    "plate": plate_text,
+                    "keypoints": None,
+                    "alert": False
+                })
 
         # ---------------------------------------------------------------------
-        # 4. YuNet Face Detection
+        # 4. YuNet Face Detection with Debounce (Frame Persistence)
         # ---------------------------------------------------------------------
         if enable_face and self.face_cascade is not None:
+            current_faces: List[Dict[str, Any]] = []
             try:
                 self.face_cascade.setInputSize((w, h))
                 _, faces = self.face_cascade.detect(frame)
                 if faces is not None:
                     for face in faces:
-                        fx, fy, fw, fh = int(face[0]), int(face[1]), int(face[2]), int(face[3])
                         conf_f = float(face[14]) if len(face) > 14 else 0.80
-                        detections.append({
-                            "label": "FACE",
-                            "conf": round(conf_f, 2),
-                            "bbox": [fx, fy, fx + fw, fy + fh],
-                            "plate": "",
-                            "keypoints": None,
-                            "alert": False
-                        })
+                        if conf_f >= 0.75:
+                            fx, fy, fw, fh = int(face[0]), int(face[1]), int(face[2]), int(face[3])
+                            current_faces.append({
+                                "label": "FACE",
+                                "conf": round(conf_f, 2),
+                                "bbox": [fx, fy, fx + fw, fy + fh],
+                                "plate": "",
+                                "keypoints": None,
+                                "alert": False
+                            })
             except Exception:
                 pass
+
+            # Frame-persistence debounce logic:
+            # Store coordinates of last detected face. If engine loses face for only 1 or 2 frames,
+            # continue drawing the last known bounding box to prevent flickering.
+            if current_faces:
+                detections.extend(current_faces)
+                self.face_persistence[camera_id] = {
+                    "faces": current_faces,
+                    "missed_frames": 0
+                }
+            else:
+                last_tracker = self.face_persistence.get(camera_id)
+                if last_tracker and last_tracker.get("faces") and last_tracker.get("missed_frames", 0) < 2:
+                    last_tracker["missed_frames"] += 1
+                    for persisted_face in last_tracker["faces"]:
+                        detections.append(dict(persisted_face))
+                else:
+                    self.face_persistence[camera_id] = {"faces": [], "missed_frames": 999}
 
         # ---------------------------------------------------------------------
         # 5. BLA (Breach Logic Analytics)
@@ -644,6 +757,7 @@ class IBVAPSurveillanceEngine:
                 "plates": plate_count,
                 "breaches": breach_count,
                 "active_alerts": all_alerts[:15],
+                "recent_plates": list(self.recent_plates),
                 "timestamp": time.time()
             })
 
@@ -706,7 +820,13 @@ class IBVAPSurveillanceEngine:
                 tag = f"BREACH DETECTED {int(conf * 100)}%"
             elif label == "PLATE":
                 box_color = BOX_COLORS["PLATE"]
-                tag = det.get("plate", "PLATE")
+                plate_val = (det.get("plate") or "").strip()
+                if plate_val and plate_val != "PLATE DETECTED":
+                    tag = f"PLATE: {plate_val}"
+                elif plate_val:
+                    tag = plate_val
+                else:
+                    tag = f"PLATE {int(conf * 100)}%"
             else:
                 box_color = BOX_COLORS.get(label, (255, 255, 255))
                 tag = f"{label} {conf:.2f}"
@@ -716,10 +836,16 @@ class IBVAPSurveillanceEngine:
 
             # Label banner
             (tw, th), _ = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-            tag_y1 = max(0, y1 - th - 6)
-            cv2.rectangle(annotated, (x1, tag_y1), (x1 + tw + 6, y1), box_color, -1)
+            if y1 - th - 6 >= 0:
+                tag_y1 = y1 - th - 6
+                text_y = y1 - 4
+                cv2.rectangle(annotated, (x1, tag_y1), (x1 + tw + 6, y1), box_color, -1)
+            else:
+                tag_y1 = y2
+                text_y = y2 + th + 4
+                cv2.rectangle(annotated, (x1, tag_y1), (x1 + tw + 6, y2 + th + 6), box_color, -1)
             text_color = (255, 255, 255) if is_alert or label == "PLATE" else (10, 10, 10)
-            cv2.putText(annotated, tag, (x1 + 3, y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.45, text_color, 1, cv2.LINE_AA)
+            cv2.putText(annotated, tag, (x1 + 3, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, text_color, 1, cv2.LINE_AA)
 
             # 4. Draw 17-Point Pose Skeleton
             if draw_skeletons and det.get("keypoints") is not None:
@@ -777,11 +903,16 @@ class IBVAPSurveillanceEngine:
             while True:
                 f_start = time.perf_counter()
                 ret, frame = cap.read()
-                if not ret:
-                    if isinstance(resolved_source, str) and os.path.exists(resolved_source):
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                if not ret or frame is None:
+                    # Seamless Video Looping: reset back to beginning on EOF so stream never goes black
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        cap.open(resolved_source)
+                        ret, frame = cap.read()
+                    if not ret or frame is None:
+                        time.sleep(0.025)
                         continue
-                    break
 
                 if draw_overlay:
                     results = self.process_frame(
@@ -815,7 +946,13 @@ class IBVAPSurveillanceEngine:
                 else:
                     annotated_frame = frame
 
-                ret_enc, buffer = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                # Mobile bandwidth optimization: limit width to 854px
+                if annotated_frame.shape[1] > 854:
+                    scale = 854.0 / annotated_frame.shape[1]
+                    annotated_frame = cv2.resize(annotated_frame, (854, int(annotated_frame.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+
+                # Compress using JPEG quality 70 to minimize mobile network bandwidth
+                ret_enc, buffer = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
                 if not ret_enc:
                     continue
 
@@ -835,10 +972,12 @@ class IBVAPSurveillanceEngine:
         Stitches 3 camera feeds horizontally into a single unified surveillance canvas.
         """
         caps = []
+        last_mosaic_frames: List[Optional[np.ndarray]] = []
         for s in sources:
             resolved = os.path.join(BASE_DIR, s) if not os.path.isabs(s) else s
             c = cv2.VideoCapture(resolved)
             caps.append(c)
+            last_mosaic_frames.append(None)
 
         target_w, target_h = 426, 240  # 3 x 426 = 1278 wide
 
@@ -848,16 +987,28 @@ class IBVAPSurveillanceEngine:
                 for idx, c in enumerate(caps):
                     cam_key = str(idx + 1)
                     ret, fr = c.read()
-                    if not ret:
+                    if not ret or fr is None:
+                        # Seamless Video Looping for mosaic feeds
                         c.set(cv2.CAP_PROP_POS_FRAMES, 0)
                         ret, fr = c.read()
+                        if not ret or fr is None:
+                            src_cand = sources[idx]
+                            res_cand = os.path.join(BASE_DIR, src_cand) if not os.path.isabs(src_cand) else src_cand
+                            c.open(res_cand)
+                            ret, fr = c.read()
+
                     if not ret or fr is None:
-                        fr = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+                        if last_mosaic_frames[idx] is not None:
+                            fr = last_mosaic_frames[idx].copy()
+                        else:
+                            fr = np.zeros((target_h, target_w, 3), dtype=np.uint8)
                     else:
-                        # Process on GPU
-                        res = self.process_frame(fr, camera_id=f"CAM_{cam_key}", conf_thresh=conf_thresh, imgsz=384)
-                        fr = self.draw_overlays(fr, res["detections"], camera_id=f"CAM_{cam_key}")
-                        fr = cv2.resize(fr, (target_w, target_h))
+                        last_mosaic_frames[idx] = fr.copy()
+
+                    # Process on GPU
+                    res = self.process_frame(fr, camera_id=f"CAM_{cam_key}", conf_thresh=conf_thresh, imgsz=384)
+                    fr = self.draw_overlays(fr, res["detections"], camera_id=f"CAM_{cam_key}")
+                    fr = cv2.resize(fr, (target_w, target_h))
 
                     # Add camera label header
                     lbl = CAMERA_CONFIGS.get(cam_key, {}).get("label", f"CAM {cam_key}")
@@ -867,7 +1018,13 @@ class IBVAPSurveillanceEngine:
                 # Horizontal stitch
                 mosaic = np.hstack(frames)
 
-                ret_enc, buffer = cv2.imencode(".jpg", mosaic, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                # Resize final 3-camera mosaic frame to a maximum width of 1280px
+                if mosaic.shape[1] > 1280:
+                    scale = 1280.0 / mosaic.shape[1]
+                    mosaic = cv2.resize(mosaic, (1280, int(mosaic.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+
+                # Compress using JPEG quality 70 to minimize bandwidth consumption
+                ret_enc, buffer = cv2.imencode(".jpg", mosaic, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
                 if not ret_enc:
                     continue
 
@@ -885,7 +1042,7 @@ class IBVAPSurveillanceEngine:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle manager: load and warm up all AI engines on startup."""
+    """Lifecycle manager: load AI engines on GPU and open Ngrok tunnel on startup."""
     logger.info("=== Starting IBVAP Multi-Camera Surveillance Server ===")
     cuda_status = torch.cuda.is_available()
     device_name = torch.cuda.get_device_name(0) if cuda_status else "CPU"
@@ -893,10 +1050,60 @@ async def lifespan(app: FastAPI):
 
     app.state.engine = IBVAPSurveillanceEngine(model_path="yolov8n-pose.pt")
     app.state.startup_time = time.time()
+    app.state.public_url = None
+
+    # Automatic Public Link (Ngrok Integration)
+    port = int(os.getenv("PORT", 8000))
+    if PYNGROK_AVAILABLE:
+        def init_ngrok():
+            try:
+                from pyngrok import conf
+                cfg_path = os.path.expandvars(r"%LOCALAPPDATA%\ngrok\ngrok.yml")
+                if os.path.exists(cfg_path):
+                    conf.get_default().config_path = cfg_path
+
+                token = os.getenv("NGROK_AUTHTOKEN")
+                if token:
+                    ngrok.set_auth_token(token)
+
+                domain = os.getenv("NGROK_DOMAIN", "penknife-willpower-flier.ngrok-free.dev")
+                try:
+                    tunnel = ngrok.connect(port, "http", domain=domain)
+                except Exception as ex_dom:
+                    logger.info(f"Custom domain connect notice: {ex_dom}, using dynamic tunnel...")
+                    tunnel = ngrok.connect(port, "http")
+
+                public_url = tunnel.public_url
+                app.state.public_url = public_url
+
+                banner = f"""
+=============================================================================
+   🌐 IBVAP SECURE PUBLIC LINK ACTIVE
+   Public Frontend : {public_url}/frontend
+   Public API Docs : {public_url}/docs
+   Local Stream    : http://localhost:{port}/frontend
+=============================================================================
+"""
+                print(banner, flush=True)
+                logger.info(f"Public Ngrok tunnel established: {public_url}")
+            except Exception as e:
+                err_str = str(e)
+                if "ERR_NGROK_4018" in err_str or "authentication failed" in err_str:
+                    logger.warning("Ngrok requires an authtoken. Set NGROK_AUTHTOKEN environment variable or run 'ngrok config add-authtoken <TOKEN>' to activate the public link.")
+                else:
+                    logger.warning(f"Ngrok tunnel notice: {e}")
+
+        ngrok_thread = threading.Thread(target=init_ngrok, daemon=True, name="NgrokInitThread")
+        ngrok_thread.start()
 
     yield
 
     logger.info("=== Shutting down IBVAP FastAPI Server ===")
+    if PYNGROK_AVAILABLE:
+        try:
+            ngrok.kill()
+        except Exception:
+            pass
     if hasattr(app.state, "engine"):
         del app.state.engine
 
@@ -932,6 +1139,7 @@ async def root():
         "project": "IBVAP - Intelligent Border Video Analytics Platform",
         "version": "3.0.0",
         "status": "online",
+        "public_url": getattr(app.state, "public_url", None),
         "active_gpu": cuda_available and (engine.device == "cuda" if engine else False),
         "device_name": device_name,
         "cuda_available": cuda_available,
@@ -997,6 +1205,7 @@ async def get_realtime_telemetry():
         "defense_status": defense_status,
         "threat_level": threat_level,
         "has_breach": has_breach,
+        "public_url": getattr(app.state, "public_url", None),
         "fps": live_stats.get("fps", 0.0),
         "latency_ms": live_stats.get("latency_ms", 0.0),
         "uptime_seconds": uptime_sec,
@@ -1017,8 +1226,19 @@ async def get_realtime_telemetry():
             "yunet_face": "ACTIVE" if engine and engine.face_cascade else "STANDBY",
             "bla_engine": "ACTIVE (Multi-Camera Tripwire)" if engine and engine.bla_engines else "STANDBY"
         },
-        "active_alerts": live_stats.get("active_alerts", [])
+        "active_alerts": live_stats.get("active_alerts", []),
+        "recent_plates": live_stats.get("recent_plates", [])
     }
+
+
+@app.get("/api/anpr/registry", tags=["ANPR"])
+async def get_anpr_registry():
+    """Retrieve full live ANPR vehicle registry."""
+    engine: IBVAPSurveillanceEngine = getattr(app.state, "engine", None)
+    if not engine:
+        return {"registry": []}
+    with engine.telemetry_lock:
+        return {"registry": list(engine.recent_plates)}
 
 
 @app.get("/api/status", tags=["System"])

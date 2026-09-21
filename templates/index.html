@@ -617,8 +617,88 @@
       gap: 1rem;
     }
 
-    @media (max-width: 1100px) {
+    /* =========================================================================
+       Mobile & Tablet Responsive Design (Flexible Media Queries)
+       ========================================================================= */
+    @media (max-width: 1200px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); }
+      .camera-grid.layout-3col { grid-template-columns: repeat(2, 1fr); }
       .intel-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      header {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+      }
+      .header-chips {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
+      .container {
+        padding: 0.85rem 1rem 2rem;
+      }
+      .cmd-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .cmd-item {
+        border-right: none;
+        border-bottom: 1px solid var(--bd);
+        padding: 0.55rem 0.85rem;
+      }
+      .camera-grid.layout-3col, .camera-grid.layout-focus {
+        grid-template-columns: 1fr;
+      }
+      .cam-viewport {
+        aspect-ratio: 16 / 9;
+      }
+      .cam-foot {
+        flex-wrap: wrap;
+      }
+      select.cam-src-select {
+        min-height: 38px;
+        font-size: 0.75rem;
+      }
+      .btn-icon {
+        min-height: 38px;
+        min-width: 38px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .brand-title {
+        font-size: 1.15rem;
+      }
+      .brand-sub {
+        font-size: 0.55rem;
+      }
+      .cmd-bar {
+        grid-template-columns: 1fr;
+      }
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+      }
+      .scard-num {
+        font-size: 1.45rem;
+      }
+      .cam-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .layout-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+      .anpr-table th, .anpr-table td {
+        padding: 0.35rem 0.45rem;
+        font-size: 0.62rem;
+      }
     }
 
     .panel-box {
@@ -654,54 +734,140 @@
       display: inline-block;
     }
 
-    /* Gauge */
-    .gauge-track {
-      width: 100%;
-      height: 7px;
-      background: #08101a;
-      border-radius: var(--radius-full);
-      overflow: hidden;
-      border: 1px solid var(--bd);
-      margin: 4px 0 8px;
-    }
-
-    .gauge-fill {
-      height: 100%;
-      width: 25%;
-      background: linear-gradient(90deg, var(--ac), var(--gn));
-      box-shadow: 0 0 10px var(--ac-gl);
-      transition: width 0.4s ease;
-    }
-
-    .hw-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
-    }
-
-    .hw-item {
-      background: var(--bg-surface);
+    /* ANPR Vehicle Registry Container & Table */
+    .anpr-registry-container {
+      background: #03060a;
       border: 1px solid var(--bd);
       border-radius: var(--radius-sm);
-      padding: 0.45rem 0.6rem;
+      height: 185px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--bd-hi) transparent;
+    }
+
+    .anpr-registry-container::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .anpr-registry-container::-webkit-scrollbar-thumb {
+      background: var(--bd-hi);
+      border-radius: 4px;
+    }
+
+    .anpr-table {
+      width: 100%;
+      border-collapse: collapse;
       font-family: var(--mo);
+      font-size: 0.68rem;
     }
 
-    .hw-k {
-      font-size: 0.52rem;
+    .anpr-table thead th {
+      position: sticky;
+      top: 0;
+      background: rgba(10, 18, 30, 0.96);
+      backdrop-filter: blur(4px);
       color: var(--dm);
+      font-size: 0.56rem;
+      font-weight: 800;
+      letter-spacing: 1.2px;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      padding: 0.45rem 0.6rem;
+      border-bottom: 1px solid var(--bd);
+      text-align: left;
+      z-index: 2;
     }
 
-    .hw-v {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--ac);
-      margin-top: 2px;
+    .anpr-table tbody tr {
+      border-bottom: 1px solid rgba(26, 42, 69, 0.35);
+      transition: background 0.15s ease;
+    }
+
+    .anpr-table tbody tr:hover {
+      background: rgba(0, 212, 255, 0.05);
+    }
+
+    .anpr-table tbody tr.new-entry {
+      animation: anprRowFlash 1.2s ease-out;
+    }
+
+    @keyframes anprRowFlash {
+      0% { background: rgba(0, 212, 255, 0.25); }
+      100% { background: transparent; }
+    }
+
+    .anpr-table td {
+      padding: 0.42rem 0.6rem;
+      vertical-align: middle;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    }
+
+    .anpr-ts {
+      color: var(--dm);
+      font-size: 0.62rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .anpr-plate-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #091424;
+      border: 1px solid #1a385c;
+      border-radius: 3px;
+      padding: 2px 7px;
+      font-weight: 800;
+      font-size: 0.72rem;
+      letter-spacing: 1.2px;
+      color: #e2f1ff;
+      box-shadow: inset 0 0 6px rgba(0, 212, 255, 0.08);
+    }
+
+    .anpr-cam-pill {
+      font-size: 0.50rem;
+      color: var(--ac);
+      background: var(--ac-lo);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      border-radius: 2px;
+      padding: 1px 4px;
+      font-weight: 700;
+    }
+
+    .anpr-status {
+      display: inline-block;
+      font-size: 0.56rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: var(--radius-full);
+      text-align: center;
+    }
+
+    .anpr-status.cleared {
+      background: var(--gn-lo);
+      color: var(--gn);
+      border: 1px solid rgba(0, 232, 135, 0.4);
+    }
+
+    .anpr-status.flagged {
+      background: var(--rd-lo);
+      color: var(--rd);
+      border: 1px solid rgba(255, 59, 92, 0.5);
+      box-shadow: 0 0 8px rgba(255, 59, 92, 0.3);
+      animation: pulse-flag 2s infinite;
+    }
+
+    @keyframes pulse-flag {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(255, 59, 92, 0.3); }
+      50% { opacity: 0.75; box-shadow: 0 0 14px rgba(255, 59, 92, 0.6); }
+    }
+
+    .anpr-empty-row td {
+      text-align: center;
+      color: var(--dm);
+      font-size: 0.60rem;
+      letter-spacing: 1px;
+      padding: 2.2rem 0.5rem;
     }
 
     /* Pipeline Rows */
@@ -806,6 +972,16 @@
 
   <!-- Container -->
   <div class="container">
+
+    <!-- Public Ngrok Mobile Access Banner -->
+    <div id="publicLinkBanner" style="display: none; margin-bottom: 1rem; padding: 0.65rem 1rem; background: linear-gradient(90deg, rgba(0, 212, 255, 0.15), rgba(0, 232, 135, 0.12)); border: 1px solid var(--ac); border-radius: var(--radius-md); font-family: var(--mo); font-size: 0.74rem; justify-content: space-between; align-items: center; box-shadow: 0 0 15px var(--ac-gl);">
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="color: var(--gn); font-size: 1.1rem;">🌐</span>
+        <strong style="color: var(--tx-bright);">PUBLIC MOBILE LINK:</strong>
+        <a id="publicLinkAnchor" href="#" target="_blank" style="color: var(--ac); text-decoration: underline; font-weight: 700; word-break: break-all;"></a>
+      </div>
+      <button onclick="copyPublicLink()" class="btn-hdr" style="cursor: pointer; padding: 0.3rem 0.75rem; flex-shrink: 0;">Copy Link</button>
+    </div>
 
     <!-- Tactical Command Bar -->
     <div class="cmd-bar">
@@ -997,38 +1173,28 @@
     <!-- Bottom Intelligence & Telemetry Panels (3 Columns) -->
     <div class="intel-grid">
 
-      <!-- 1. Hardware Telemetry Panel -->
+      <!-- 1. ANPR Vehicle Registry Panel -->
       <div class="panel-box">
         <div class="panel-hdr">
-          <span>HARDWARE TELEMETRY</span>
-          <span style="color: var(--gn); font-size: 0.62rem;">CUDA:0 ACCELERATED</span>
+          <span>ANPR VEHICLE REGISTRY</span>
+          <span id="anprCounterBadge" style="color: var(--gn); font-size: 0.62rem;">0 DETECTIONS</span>
         </div>
 
-        <div style="display: flex; justify-content: space-between; font-family: var(--mo); font-size: 0.64rem;">
-          <span style="color: var(--dm);">VRAM UTILIZATION</span>
-          <span id="vramText" style="color: var(--ac);">-- MB</span>
-        </div>
-        <div class="gauge-track">
-          <div class="gauge-fill" id="vramBar"></div>
-        </div>
-
-        <div class="hw-grid">
-          <div class="hw-item">
-            <div class="hw-k">ACCELERATOR</div>
-            <div class="hw-v" id="gpuModelText">RTX 4050</div>
-          </div>
-          <div class="hw-item">
-            <div class="hw-k">CUDA VERSION</div>
-            <div class="hw-v" id="cudaVerText">12.1 (cu121)</div>
-          </div>
-          <div class="hw-item">
-            <div class="hw-k">ENGINE UPTIME</div>
-            <div class="hw-v" id="uptimeText">0.0s</div>
-          </div>
-          <div class="hw-item">
-            <div class="hw-k">ACTIVE SESSIONS</div>
-            <div class="hw-v" style="color: var(--gn);">3 CAMERAS</div>
-          </div>
+        <div class="anpr-registry-container">
+          <table class="anpr-table">
+            <thead>
+              <tr>
+                <th style="width: 28%;">TIMESTAMP</th>
+                <th style="width: 44%;">PLATE NUMBER</th>
+                <th style="width: 28%; text-align: right;">STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="anprRegistryBody">
+              <tr class="anpr-empty-row">
+                <td colspan="3">AWAITING VEHICLE PASS-THROUGH...</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1107,11 +1273,8 @@
     const gpuBadgeHeader = document.getElementById('gpuBadgeHeader');
     const clockDisplay = document.getElementById('clockDisplay');
 
-    const vramText = document.getElementById('vramText');
-    const vramBar = document.getElementById('vramBar');
-    const gpuModelText = document.getElementById('gpuModelText');
-    const cudaVerText = document.getElementById('cudaVerText');
-    const uptimeText = document.getElementById('uptimeText');
+    const anprRegistryBody = document.getElementById('anprRegistryBody');
+    const anprCounterBadge = document.getElementById('anprCounterBadge');
 
     const cameraContainer = document.getElementById('cameraContainer');
     const btnLayout3Col = document.getElementById('btnLayout3Col');
@@ -1258,21 +1421,9 @@
         }
 
         if (data.gpu) {
-          const alloc = data.gpu.memory_allocated_mb || 0;
-          const resv = data.gpu.memory_reserved_mb || 1;
-          vramText.textContent = `${alloc} MB / ${resv} MB`;
-          const pct = Math.min(100, Math.max(8, (alloc / Math.max(resv, 1024)) * 100));
-          vramBar.style.width = `${pct}%`;
-
           const gName = (data.gpu.device_name || 'RTX 4050').replace('NVIDIA ', '');
-          gpuModelText.textContent = gName;
-          cmdGpuName.textContent = `${gName} (CUDA:0)`;
-          gpuBadgeHeader.textContent = `${gName} ACTIVE`;
-          cudaVerText.textContent = data.gpu.cuda_version ? `CUDA ${data.gpu.cuda_version}` : 'CPU Mode';
-        }
-
-        if (data.uptime_seconds) {
-          uptimeText.textContent = `${data.uptime_seconds}s`;
+          if (cmdGpuName) cmdGpuName.textContent = `${gName} (CUDA:0)`;
+          if (gpuBadgeHeader) gpuBadgeHeader.textContent = `${gName} ACTIVE`;
         }
 
         // Threat level updates
@@ -1286,6 +1437,16 @@
           statBreachSub.textContent = 'VIRTUAL TRIPWIRE & CLIMB';
         }
 
+        // Public Link check
+        if (data.public_url) {
+          const banner = document.getElementById('publicLinkBanner');
+          const anchor = document.getElementById('publicLinkAnchor');
+          banner.style.display = 'flex';
+          const fullUrl = data.public_url.endsWith('/') ? `${data.public_url}frontend` : `${data.public_url}/frontend`;
+          anchor.href = fullUrl;
+          anchor.textContent = fullUrl;
+        }
+
         // Audit log alerts
         if (data.active_alerts && data.active_alerts.length > 0) {
           data.active_alerts.forEach(al => {
@@ -1296,7 +1457,116 @@
             }
           });
         }
+
+        // ANPR Vehicle Registry update
+        if (data.recent_plates && Array.isArray(data.recent_plates)) {
+          updateAnprRegistry(data.recent_plates);
+        }
       } catch (err) {}
+    }
+
+    // ANPR Vehicle Registry Manager
+    const anprRegistryData = [];
+    const seenPlateDetections = new Set();
+
+    function updateAnprRegistry(plates) {
+      if (!anprRegistryBody || !Array.isArray(plates)) return;
+
+      let hasNew = false;
+      plates.forEach(item => {
+        if (!item || !item.plate) return;
+        const plateStr = String(item.plate).trim();
+        if (!plateStr || plateStr === 'PLATE DETECTED') return;
+
+        // Unique identifier per detection instance
+        const detKey = `${item.epoch || item.timestamp}_${plateStr}_${item.camera_id || ''}`;
+        if (!seenPlateDetections.has(detKey)) {
+          seenPlateDetections.add(detKey);
+          hasNew = true;
+
+          // Database Status Simulation: use backend status or randomly assign 'CLEARED' / 'FLAGGED'
+          const status = item.status || (Math.random() < 0.25 ? 'FLAGGED' : 'CLEARED');
+          const ts = item.timestamp || new Date().toTimeString().split(' ')[0];
+          const cam = item.camera_id ? item.camera_id.replace('CAM_', 'CAM ') : 'CAM 1';
+
+          anprRegistryData.unshift({
+            key: detKey,
+            timestamp: ts,
+            plate: plateStr,
+            status: status,
+            camera: cam,
+            isNew: true
+          });
+
+          // Limit rolling buffer to 60 recent plates
+          if (anprRegistryData.length > 60) {
+            anprRegistryData.pop();
+          }
+
+          // Forward to Surveillance Audit Terminal
+          logEvent('ANPR', `Vehicle Plate [${plateStr}] ${status} scanned @ ${item.camera_id || 'CAM_1'}`, status === 'FLAGGED' ? 'breach' : 'anpr');
+        }
+      });
+
+      if (hasNew || (anprRegistryBody.querySelector('.anpr-empty-row') && anprRegistryData.length > 0)) {
+        renderAnprRegistry();
+      }
+    }
+
+    function renderAnprRegistry() {
+      if (!anprRegistryBody) return;
+
+      if (anprRegistryData.length === 0) {
+        anprRegistryBody.innerHTML = `
+          <tr class="anpr-empty-row">
+            <td colspan="3">AWAITING VEHICLE PASS-THROUGH...</td>
+          </tr>`;
+        if (anprCounterBadge) anprCounterBadge.textContent = '0 DETECTIONS';
+        return;
+      }
+
+      if (anprCounterBadge) {
+        anprCounterBadge.textContent = `${anprRegistryData.length} DETECTIONS`;
+      }
+
+      const rowsHtml = anprRegistryData.map(entry => {
+        const isFlagged = entry.status === 'FLAGGED';
+        const statusClass = isFlagged ? 'flagged' : 'cleared';
+        const animClass = entry.isNew ? 'new-entry' : '';
+        entry.isNew = false;
+
+        return `
+          <tr class="${animClass}">
+            <td class="anpr-ts">${entry.timestamp}</td>
+            <td>
+              <span class="anpr-plate-badge">
+                ${entry.plate}
+                <span class="anpr-cam-pill">${entry.camera}</span>
+              </span>
+            </td>
+            <td style="text-align: right;">
+              <span class="anpr-status ${statusClass}">${entry.status}</span>
+            </td>
+          </tr>`;
+      }).join('');
+
+      anprRegistryBody.innerHTML = rowsHtml;
+    }
+
+    // Public Link Copy helper
+    function copyPublicLink() {
+      const anchor = document.getElementById('publicLinkAnchor');
+      if (anchor && anchor.href) {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(anchor.href).then(() => {
+            logEvent('PUBLIC', `Copied public link to clipboard: ${anchor.href}`, 'face');
+          }).catch(() => {
+            prompt('Copy public link:', anchor.href);
+          });
+        } else {
+          prompt('Copy public link:', anchor.href);
+        }
+      }
     }
 
     // Boot Sequence
