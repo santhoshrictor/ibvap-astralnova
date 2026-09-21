@@ -312,8 +312,13 @@
     const select = document.getElementById(selectElemId);
     if (!video || !select) return;
 
-    const newSource = select.value;
+    let newSource = select.value;
+    if (!newSource.includes('?v=')) {
+      newSource += (newSource.includes('?') ? '&' : '?') + 'v=2';
+    }
     video.src = newSource;
+    video.muted = true;
+    video.defaultMuted = true;
     video.load();
     video.play().catch(() => {});
 
@@ -531,6 +536,27 @@
   window.addEventListener('DOMContentLoaded', () => {
     resizeOverlays();
     seedInitialPlates();
+
+    // Start all 3 video feeds with robust autoplay handling
+    ['videoCam1', 'videoCam2', 'videoCam3'].forEach(id => {
+      const v = document.getElementById(id);
+      if (v) {
+        v.muted = true;
+        v.defaultMuted = true;
+        v.playsInline = true;
+        const playPromise = v.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Autoplay blocked by browser policy: start upon first click anywhere
+            const startOnInteraction = () => {
+              v.play().catch(() => {});
+              document.removeEventListener('click', startOnInteraction);
+            };
+            document.addEventListener('click', startOnInteraction, { once: true });
+          });
+        }
+      }
+    });
 
     logEvent('SYS', 'IBVAP Serverless Telemetry Engine Initialized', 'sys');
     logEvent('ENGINES', 'Modular Pipelines: YOLOv8 Pose + Plate YOLO + EasyOCR Active', 'pose');

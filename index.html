@@ -134,17 +134,17 @@
         </div>
 
         <div class="cam-viewport" id="viewportCam1">
-          <video id="videoCam1" autoplay muted loop playsinline src="fence.mp4"></video>
+          <video id="videoCam1" autoplay muted loop playsinline preload="auto" src="fence.mp4?v=2"></video>
           <canvas class="ai-overlay" id="overlayCam1"></canvas>
           <div class="corner-brackets"></div>
         </div>
 
         <div class="cam-foot">
           <select class="cam-src-select" id="selectCam1" onchange="changeVideoSource('videoCam1', 'selectCam1', 'CAM 1')">
-            <option value="fence.mp4" selected>fence.mp4 (Fence Perimeter)</option>
-            <option value="fence1.mp4">fence1.mp4 (Perimeter Alt)</option>
-            <option value="vehicle.mp4">vehicle.mp4 (Checkpoint Lane)</option>
-            <option value="sample.mp4">sample.mp4 (Aerial Patrol)</option>
+            <option value="fence.mp4?v=2" selected>fence.mp4 (Fence Perimeter)</option>
+            <option value="fence1.mp4?v=2">fence1.mp4 (Perimeter Alt)</option>
+            <option value="vehicle.mp4?v=2">vehicle.mp4 (Checkpoint Lane)</option>
+            <option value="sample.mp4?v=2">sample.mp4 (Aerial Patrol)</option>
           </select>
           <div class="cam-actions">
             <button class="btn-icon" onclick="snapshotVideo('videoCam1', 'CAM1_HAWKINS')" title="Capture Snapshot">
@@ -171,17 +171,17 @@
         </div>
 
         <div class="cam-viewport" id="viewportCam2">
-          <video id="videoCam2" autoplay muted loop playsinline src="vehicle.mp4"></video>
+          <video id="videoCam2" autoplay muted loop playsinline preload="auto" src="vehicle.mp4?v=2"></video>
           <canvas class="ai-overlay" id="overlayCam2"></canvas>
           <div class="corner-brackets"></div>
         </div>
 
         <div class="cam-foot">
           <select class="cam-src-select" id="selectCam2" onchange="changeVideoSource('videoCam2', 'selectCam2', 'CAM 2')">
-            <option value="vehicle.mp4" selected>vehicle.mp4 (Vehicle Checkpoint)</option>
-            <option value="fence.mp4">fence.mp4 (Fence Perimeter)</option>
-            <option value="sample.mp4">sample.mp4 (Aerial Patrol)</option>
-            <option value="fence1.mp4">fence1.mp4 (Perimeter Alt)</option>
+            <option value="vehicle.mp4?v=2" selected>vehicle.mp4 (Vehicle Checkpoint)</option>
+            <option value="fence.mp4?v=2">fence.mp4 (Fence Perimeter)</option>
+            <option value="sample.mp4?v=2">sample.mp4 (Aerial Patrol)</option>
+            <option value="fence1.mp4?v=2">fence1.mp4 (Perimeter Alt)</option>
           </select>
           <div class="cam-actions">
             <button class="btn-icon" onclick="snapshotVideo('videoCam2', 'CAM2_OUTPOST')" title="Capture Snapshot">
@@ -208,17 +208,17 @@
         </div>
 
         <div class="cam-viewport" id="viewportCam3">
-          <video id="videoCam3" autoplay muted loop playsinline src="sample.mp4"></video>
+          <video id="videoCam3" autoplay muted loop playsinline preload="auto" src="sample.mp4?v=2"></video>
           <canvas class="ai-overlay" id="overlayCam3"></canvas>
           <div class="corner-brackets"></div>
         </div>
 
         <div class="cam-foot">
           <select class="cam-src-select" id="selectCam3" onchange="changeVideoSource('videoCam3', 'selectCam3', 'CAM 3')">
-            <option value="sample.mp4" selected>sample.mp4 (Aerial Patrol)</option>
-            <option value="sample2.mp4">sample2.mp4 (Sector Sweep Alt)</option>
-            <option value="fence.mp4">fence.mp4 (Fence Perimeter)</option>
-            <option value="vehicle.mp4">vehicle.mp4 (Checkpoint Lane)</option>
+            <option value="sample.mp4?v=2" selected>sample.mp4 (Aerial Patrol)</option>
+            <option value="sample2.mp4?v=2">sample2.mp4 (Sector Sweep Alt)</option>
+            <option value="fence.mp4?v=2">fence.mp4 (Fence Perimeter)</option>
+            <option value="vehicle.mp4?v=2">vehicle.mp4 (Checkpoint Lane)</option>
           </select>
           <div class="cam-actions">
             <button class="btn-icon" onclick="snapshotVideo('videoCam3', 'CAM3_ALPHA')" title="Capture Snapshot">
