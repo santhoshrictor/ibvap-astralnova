@@ -393,143 +393,16 @@
   }
   window.addEventListener('resize', resizeOverlays);
 
-  let animFrame = 0;
   function renderAiOverlays() {
-    animFrame++;
-    const t = animFrame * 0.03;
-
-    // --- Overlay 1: Hawkins Post (Pose + Virtual Fence Tripwire) ---
-    const c1 = document.getElementById('overlayCam1');
-    if (c1) {
-      const ctx = c1.getContext('2d');
-      const w = c1.width;
-      const h = c1.height;
-      ctx.clearRect(0, 0, w, h);
-
-      // Virtual Tripwire Line across perimeter
-      const tripwireY = h * 0.72;
-      ctx.beginPath();
-      ctx.moveTo(w * 0.05, tripwireY);
-      ctx.lineTo(w * 0.95, tripwireY);
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 6]);
-      ctx.strokeStyle = isBreachActive ? 'rgba(255, 61, 61, 0.85)' : 'rgba(0, 212, 255, 0.65)';
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Tripwire HUD label
-      ctx.fillStyle = isBreachActive ? 'rgba(255, 61, 61, 0.9)' : 'rgba(0, 212, 255, 0.8)';
-      ctx.font = '10px "JetBrains Mono", monospace';
-      ctx.fillText(isBreachActive ? '⚠ BLA TRIPWIRE: BREACH DETECTED' : '⚡ BLA TRIPWIRE: ARMED', w * 0.08, tripwireY - 6);
-
-      // Moving Simulated Person Bounding Box
-      const pX = w * (0.35 + Math.sin(t * 0.6) * 0.15);
-      const pY = h * (0.32 + Math.cos(t * 0.4) * 0.05);
-      const bW = w * 0.14;
-      const bH = h * 0.48;
-
-      ctx.strokeStyle = isBreachActive ? '#ff3d3d' : '#00e887';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(pX, pY, bW, bH);
-
-      // Bounding box tag
-      ctx.fillStyle = isBreachActive ? 'rgba(255, 61, 61, 0.8)' : 'rgba(0, 232, 135, 0.8)';
-      ctx.fillRect(pX, pY - 18, 125, 18);
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 9px "JetBrains Mono", monospace';
-      ctx.fillText(`PERSON #402 96.4%`, pX + 4, pY - 5);
-
-      // Skeletal Keypoints Simulation
-      const headX = pX + bW * 0.5;
-      const headY = pY + bH * 0.15;
-      const chestX = headX;
-      const chestY = pY + bH * 0.38;
-
-      ctx.fillStyle = '#00d4ff';
-      [
-        [headX, headY],
-        [chestX, chestY],
-        [pX + bW * 0.25, pY + bH * 0.35],
-        [pX + bW * 0.75, pY + bH * 0.35],
-        [pX + bW * 0.3, pY + bH * 0.85],
-        [pX + bW * 0.7, pY + bH * 0.85]
-      ].forEach(([kx, ky]) => {
-        ctx.beginPath();
-        ctx.arc(kx, ky, 3, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    // --- Overlay 2: Outpost Checkpoint (Vehicle & ANPR OCR Bounding Box) ---
-    const c2 = document.getElementById('overlayCam2');
-    if (c2) {
-      const ctx = c2.getContext('2d');
-      const w = c2.width;
-      const h = c2.height;
-      ctx.clearRect(0, 0, w, h);
-
-      // Vehicle Bounding Box
-      const vX = w * (0.28 + Math.sin(t * 0.3) * 0.08);
-      const vY = h * 0.28;
-      const vW = w * 0.44;
-      const vH = h * 0.55;
-
-      ctx.strokeStyle = '#c084fc';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(vX, vY, vW, vH);
-
-      ctx.fillStyle = 'rgba(192, 132, 252, 0.85)';
-      ctx.fillRect(vX, vY - 18, 140, 18);
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 9px "JetBrains Mono", monospace';
-      ctx.fillText('VEHICLE 98.2% (SUV)', vX + 4, vY - 5);
-
-      // Plate Bounding Box
-      const plX = vX + vW * 0.35;
-      const plY = vY + vH * 0.72;
-      const plW = vW * 0.32;
-      const plH = vH * 0.14;
-
-      ctx.strokeStyle = '#00d4ff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(plX, plY, plW, plH);
-
-      ctx.fillStyle = 'rgba(0, 212, 255, 0.9)';
-      ctx.fillRect(plX, plY + plH, 150, 16);
-      ctx.fillStyle = '#050a10';
-      ctx.font = 'bold 9px "JetBrains Mono", monospace';
-      ctx.fillText('ANPR: TN-09-AB-1234', plX + 4, plY + plH + 12);
-    }
-
-    // --- Overlay 3: Alpha Post (Aerial Surveillance Grid) ---
-    const c3 = document.getElementById('overlayCam3');
-    if (c3) {
-      const ctx = c3.getContext('2d');
-      const w = c3.width;
-      const h = c3.height;
-      ctx.clearRect(0, 0, w, h);
-
-      // Crosshair Reticle tracking target
-      const tX = w * (0.5 + Math.cos(t * 0.5) * 0.25);
-      const tY = h * (0.5 + Math.sin(t * 0.5) * 0.2);
-
-      ctx.strokeStyle = 'rgba(0, 212, 255, 0.75)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(tX, tY, 22, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(tX - 30, tY); ctx.lineTo(tX + 30, tY);
-      ctx.moveTo(tX, tY - 30); ctx.lineTo(tX + 30, tY);
-      ctx.stroke();
-
-      ctx.fillStyle = 'rgba(0, 212, 255, 0.9)';
-      ctx.font = '9px "JetBrains Mono", monospace';
-      ctx.fillText('AERIAL LOCK: SEC-3', tX + 26, tY - 10);
-    }
-
-    requestAnimationFrame(renderAiOverlays);
+    // Clear canvas overlays so real baked-in GPU AI detections (Pose, ANPR, Skeletons)
+    // from processed_*.mp4 show through clearly without duplicate simulated boxes
+    canvasOverlays.forEach(item => {
+      const c = document.getElementById(item.canvasId);
+      if (c) {
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, c.width, c.height);
+      }
+    });
   }
 
   // --- Boot Sequence ---
