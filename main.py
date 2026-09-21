@@ -1,19 +1,18 @@
 """
 =============================================================================
 IBVAP - Intelligent Border Video Analytics Platform
-Native FastAPI Backend Core Server (CPU Cloud Edition)
+Native FastAPI Backend Core Server (Multi-Camera & Multi-Model Edition)
 =============================================================================
 High-performance surveillance backend with:
-  1. CPU Execution: Optimized for Hugging Face Spaces & Cloud CPU Instances
-  2. YOLOv8n Pose: 17 COCO skeletal keypoint estimation & tracking (Nano)
-  3. YOLOv8n Vehicles & Plate YOLO: Automated Number Plate Recognition (ANPR)
-  4. EasyOCR: CPU-based license plate text decoding (gpu=False)
+  1. GPU Acceleration: NVIDIA GeForce RTX 4050 (CUDA)
+  2. YOLOv8 Pose: 17 COCO skeletal keypoint estimation & tracking
+  3. YOLOv8 Vehicles & Plate YOLO: Automated Number Plate Recognition (ANPR)
+  4. EasyOCR: GPU-accelerated license plate text decoding
   5. YuNet: High-speed DNN facial detection
   6. BLA Engine: Breach Logic Analytics with virtual tripwires,
      zone intrusion, loitering, and skeletal climbing/jumping kinematics
   7. Multi-Camera Architecture: 3 independent checkpoint camera feeds
      plus combined tactical mosaic streaming
-  8. Smart Frame-Skipping: 2 FPS processing cadence for low-CPU cloud deployment
 =============================================================================
 """
 
@@ -343,43 +342,45 @@ class ActivityEngine:
 
 class IBVAPSurveillanceEngine:
     """
-    Unified CPU AI surveillance engine:
-      - YOLOv8n-Pose (17 joints) on CPU
-      - YOLOv8n General Detection (cars, trucks, buses, motorcycles) on CPU
-      - Plate YOLO / Haar ANPR localization on CPU
-      - EasyOCR CPU plate character recognition (gpu=False)
-      - YuNet OpenCV DNN Face Detection on CPU
+    Unified GPU AI surveillance engine:
+      - YOLOv8-Pose (17 joints) on RTX 4050
+      - YOLOv8 Object Detection (cars, trucks, buses, motorcycles)
+      - Plate YOLO + EasyOCR for Automated Number Plate Recognition
+      - YuNet OpenCV DNN Face Detection
       - BLA Breach Logic Analytics for multiple checkpoint cameras
     """
 
-    def __init__(self, model_path: str = "yolov8n-pose.pt", device: Optional[str] = "cpu"):
+    def __init__(self, model_path: str = "yolov8n-pose.pt", device: Optional[str] = None):
         self.model_path = os.path.join(BASE_DIR, model_path) if not os.path.isabs(model_path) else model_path
         self._lock = threading.Lock()
 
-        # Cloud CPU Deployment configuration
-        self.device = "cpu"
-        self.device_name = "CPU"
+        # Resolve GPU device
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
+
+        self.device_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() and "cuda" in self.device else "CPU"
         logger.info(f"Initializing Surveillance Engine on [{self.device}] ({self.device_name})")
 
-        # 1. Load YOLOv8 Pose (Nano version: yolov8n-pose.pt)
-        pose_target = self.model_path if os.path.exists(self.model_path) else "yolov8n-pose.pt"
-        self.pose_model = YOLO(pose_target)
+        # 1. Load YOLOv8 Pose
+        self.pose_model = YOLO(self.model_path)
         try:
-            self.pose_model.to("cpu")
-            logger.info(f"YOLOv8 Pose ({pose_target}) loaded on CPU")
+            self.pose_model.to(self.device)
+            logger.info(f"YOLOv8 Pose loaded on {self.device} ({self.device_name})")
         except Exception as e:
             logger.error(f"Failed to transfer pose model: {e}")
 
-        # 2. Load YOLOv8 General Detection (Nano version: yolov8n.pt)
+        # 2. Load YOLOv8 General Detection (vehicles: car, bus, truck, motorcycle)
         self.vehicle_model = None
         yolo_gen_path = os.path.join(BASE_DIR, "yolov8n.pt")
-        veh_target = yolo_gen_path if os.path.exists(yolo_gen_path) else "yolov8n.pt"
-        try:
-            self.vehicle_model = YOLO(veh_target)
-            self.vehicle_model.to("cpu")
-            logger.info(f"YOLOv8 Vehicle model ({veh_target}) loaded on CPU")
-        except Exception as e:
-            logger.warning(f"Vehicle model notice: {e}")
+        if os.path.exists(yolo_gen_path):
+            try:
+                self.vehicle_model = YOLO(yolo_gen_path)
+                self.vehicle_model.to(self.device)
+                logger.info(f"YOLOv8 Vehicle model loaded on {self.device}")
+            except Exception as e:
+                logger.warning(f"Vehicle model notice: {e}")
 
         # 3. Load Plate YOLO model
         self.plate_model = None
@@ -387,16 +388,17 @@ class IBVAPSurveillanceEngine:
         if os.path.exists(plate_path):
             try:
                 self.plate_model = YOLO(plate_path)
-                self.plate_model.to("cpu")
-                logger.info("Plate YOLO model loaded on CPU")
+                self.plate_model.to(self.device)
+                logger.info(f"Plate YOLO model loaded on {self.device}")
             except Exception as e:
                 logger.warning(f"Plate model notice: {e}")
 
-        # 4. Load EasyOCR (ANPR Reader) - CPU Mode (gpu=False)
+        # 4. Load EasyOCR (ANPR Reader)
         self.ocr_engine = None
         try:
-            self.ocr_engine = easyocr.Reader(["en"], gpu=False)
-            logger.info("EasyOCR Reader initialized on CPU (gpu=False)")
+            use_gpu = ("cuda" in self.device)
+            self.ocr_engine = easyocr.Reader(["en"], gpu=use_gpu)
+            logger.info(f"EasyOCR Reader initialized on GPU={use_gpu}")
         except Exception as e:
             logger.warning(f"EasyOCR fallback notice: {e}")
 
@@ -442,11 +444,11 @@ class IBVAPSurveillanceEngine:
             "timestamp": time.time()
         }
 
-        # Warmup CPU
+        # Warmup GPU
         self._warmup()
 
     def _warmup(self):
-        """Warm up CPU inference engines."""
+        """Warm up CUDA kernels."""
         try:
             dummy = np.zeros((320, 320, 3), dtype=np.uint8)
             with self._lock:
@@ -455,9 +457,9 @@ class IBVAPSurveillanceEngine:
                     self.vehicle_model.predict(dummy, imgsz=320, verbose=False, device=self.device)
                 if self.plate_model:
                     self.plate_model.predict(dummy, imgsz=320, verbose=False, device=self.device)
-            logger.info("Surveillance Engine CPU warmup completed.")
+            logger.info("Surveillance Engine GPU warmup completed.")
         except Exception as e:
-            logger.warning(f"CPU warmup notice: {e}")
+            logger.warning(f"GPU warmup notice: {e}")
 
     def process_frame(
         self,
@@ -896,13 +898,6 @@ class IBVAPSurveillanceEngine:
             return
 
         fps_tracker = deque(maxlen=15)
-        target_fps = 2.0
-        target_frame_time = 1.0 / target_fps  # 0.5s per frame cadence
-
-        # Detect source video native frame rate (defaults to 30.0 if not detected or live camera)
-        raw_fps = cap.get(cv2.CAP_PROP_FPS)
-        video_fps = raw_fps if (raw_fps and raw_fps > 0 and not math.isnan(raw_fps) and raw_fps <= 120) else 30.0
-        frame_skip = max(1, int(round(video_fps / target_fps)))
 
         try:
             while True:
@@ -916,7 +911,7 @@ class IBVAPSurveillanceEngine:
                         cap.open(resolved_source)
                         ret, frame = cap.read()
                     if not ret or frame is None:
-                        time.sleep(0.05)
+                        time.sleep(0.025)
                         continue
 
                 if draw_overlay:
@@ -946,7 +941,7 @@ class IBVAPSurveillanceEngine:
 
                     # Telemetry HUD on video frame
                     cam_label = CAMERA_CONFIGS.get(camera_id.replace("CAM_", ""), {}).get("label", camera_id)
-                    hud_text = f"{cam_label} | CPU | {curr_fps} FPS (Target 2 FPS) | {results['inference_time_ms']}ms"
+                    hud_text = f"{cam_label} | GPU: {self.device_name} | {curr_fps} FPS | {results['inference_time_ms']}ms"
                     cv2.putText(annotated_frame, hud_text, (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 0), 2, cv2.LINE_AA)
                 else:
                     annotated_frame = frame
@@ -962,16 +957,7 @@ class IBVAPSurveillanceEngine:
                     continue
 
                 yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
-
-                # Frame-skipping logic: Skip (frame_skip - 1) frames so only 2 FPS are processed instead of 30
-                for _ in range(frame_skip - 1):
-                    if not cap.grab():
-                        break
-
-                # Maintain 2 FPS cadence (0.5s per frame)
-                elapsed = time.perf_counter() - f_start
-                sleep_time = max(0.01, target_frame_time - elapsed)
-                time.sleep(sleep_time)
+                time.sleep(0.025)
 
         finally:
             cap.release()
@@ -994,13 +980,9 @@ class IBVAPSurveillanceEngine:
             last_mosaic_frames.append(None)
 
         target_w, target_h = 426, 240  # 3 x 426 = 1278 wide
-        target_fps = 2.0
-        target_frame_time = 1.0 / target_fps  # 0.5s per frame
-        frame_skip = 15  # Skip ~15 frames for 30 FPS feeds to process 2 FPS
 
         try:
             while True:
-                f_start = time.perf_counter()
                 frames = []
                 for idx, c in enumerate(caps):
                     cam_key = str(idx + 1)
@@ -1023,7 +1005,7 @@ class IBVAPSurveillanceEngine:
                     else:
                         last_mosaic_frames[idx] = fr.copy()
 
-                    # Process on CPU
+                    # Process on GPU
                     res = self.process_frame(fr, camera_id=f"CAM_{cam_key}", conf_thresh=conf_thresh, imgsz=384)
                     fr = self.draw_overlays(fr, res["detections"], camera_id=f"CAM_{cam_key}")
                     fr = cv2.resize(fr, (target_w, target_h))
@@ -1032,11 +1014,6 @@ class IBVAPSurveillanceEngine:
                     lbl = CAMERA_CONFIGS.get(cam_key, {}).get("label", f"CAM {cam_key}")
                     cv2.putText(fr, f"[{lbl}]", (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 212, 255), 1, cv2.LINE_AA)
                     frames.append(fr)
-
-                    # Frame-skipping: advance video feed so only 2 FPS are processed per camera
-                    for _ in range(frame_skip - 1):
-                        if not c.grab():
-                            break
 
                 # Horizontal stitch
                 mosaic = np.hstack(frames)
@@ -1052,11 +1029,7 @@ class IBVAPSurveillanceEngine:
                     continue
 
                 yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
-
-                # Maintain 2 FPS cadence (0.5s per frame)
-                elapsed = time.perf_counter() - f_start
-                sleep_time = max(0.01, target_frame_time - elapsed)
-                time.sleep(sleep_time)
+                time.sleep(0.033)
 
         finally:
             for c in caps:
@@ -1069,18 +1042,18 @@ class IBVAPSurveillanceEngine:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle manager: load AI engines on CPU and open optional Ngrok tunnel on startup."""
-    logger.info("=== Starting IBVAP Multi-Camera Surveillance Server (CPU Cloud Edition) ===")
+    """Lifecycle manager: load AI engines on GPU and open Ngrok tunnel on startup."""
+    logger.info("=== Starting IBVAP Multi-Camera Surveillance Server ===")
     cuda_status = torch.cuda.is_available()
-    device_name = "CPU"
-    logger.info(f"Target Accelerator: CPU | CUDA Detected: {cuda_status}")
+    device_name = torch.cuda.get_device_name(0) if cuda_status else "CPU"
+    logger.info(f"CUDA: {cuda_status} | Accelerator: {device_name}")
 
-    app.state.engine = IBVAPSurveillanceEngine(model_path="yolov8n-pose.pt", device="cpu")
+    app.state.engine = IBVAPSurveillanceEngine(model_path="yolov8n-pose.pt")
     app.state.startup_time = time.time()
     app.state.public_url = None
 
     # Automatic Public Link (Ngrok Integration)
-    port = int(os.getenv("PORT", 7860))
+    port = int(os.getenv("PORT", 8000))
     if PYNGROK_AVAILABLE:
         def init_ngrok():
             try:
@@ -1137,7 +1110,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="IBVAP - Intelligent Border Video Analytics Platform",
-    description="CPU Multi-Camera Surveillance Backend with YOLOv8n Pose, Vehicle & Plate YOLO, EasyOCR ANPR, YuNet Face, & BLA Engine (Cloud Ready)",
+    description="GPU Multi-Camera Backend with YOLOv8 Pose, Vehicle & Plate YOLO, EasyOCR ANPR, YuNet Face, & BLA Engine",
     version="3.0.0",
     lifespan=lifespan
 )
@@ -1246,10 +1219,10 @@ async def get_realtime_telemetry():
             "breaches": live_stats.get("breaches", 0)
         },
         "models": {
-            "yolo_pose": "ACTIVE (CPU)" if engine and engine.pose_model else "STANDBY",
-            "yolo_vehicles": "ACTIVE (CPU)" if engine and engine.vehicle_model else "STANDBY",
-            "plate_yolo": "ACTIVE (CPU)" if engine and engine.plate_model else "STANDBY",
-            "easyocr": "ACTIVE (CPU)" if engine and engine.ocr_engine else "STANDBY",
+            "yolo_pose": "ACTIVE (CUDA:0)" if engine and engine.device == "cuda" else "ACTIVE (CPU)",
+            "yolo_vehicles": "ACTIVE" if engine and engine.vehicle_model else "STANDBY",
+            "plate_yolo": "ACTIVE" if engine and engine.plate_model else "STANDBY",
+            "easyocr": "ACTIVE (GPU)" if engine and engine.ocr_engine else "STANDBY",
             "yunet_face": "ACTIVE" if engine and engine.face_cascade else "STANDBY",
             "bla_engine": "ACTIVE (Multi-Camera Tripwire)" if engine and engine.bla_engines else "STANDBY"
         },
@@ -1416,5 +1389,4 @@ async def process_frame_endpoint(
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 7860))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
