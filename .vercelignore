@@ -1,0 +1,12 @@
+*.py
+requirements.txt
+packages.txt
+*.pt
+*.onnx
+*.xml
+*.pdf
+templates/
+sample videos/
+surveillance.db
+.cache/
+.venv/
