@@ -368,6 +368,38 @@
       display: inline-block;
     }
 
+    .toggle-trails-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--mo);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--tx);
+      cursor: pointer;
+      user-select: none;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface-elevated);
+      transition: var(--transition);
+    }
+
+    .toggle-trails-label:hover {
+      border-color: var(--ac);
+      color: var(--ac);
+      box-shadow: 0 0 10px var(--ac-gl);
+    }
+
+    .toggle-trails-label input[type="checkbox"] {
+      accent-color: var(--ac);
+      cursor: pointer;
+      width: 14px;
+      height: 14px;
+    }
+
     .layout-btns {
       display: flex;
       gap: 0.4rem;
@@ -1046,9 +1078,15 @@
     <!-- Camera Layout Bar -->
     <div class="layout-bar">
       <div class="sec-hd">Live Checkpoint Surveillance Feeds</div>
-      <div class="layout-btns">
-        <button class="btn-layout active" id="btnLayout3Col">3 Equal Columns</button>
-        <button class="btn-layout" id="btnLayoutFocus">1 Focus + 2 Aux</button>
+      <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
+        <label class="toggle-trails-label" title="Toggle vehicle & target motion tracking trails">
+          <input type="checkbox" id="checkShowTrails" />
+          <span>Show Tracking Trails</span>
+        </label>
+        <div class="layout-btns">
+          <button class="btn-layout active" id="btnLayout3Col">3 Equal Columns</button>
+          <button class="btn-layout" id="btnLayoutFocus">1 Focus + 2 Aux</button>
+        </div>
       </div>
     </div>
 
@@ -1066,7 +1104,7 @@
         </div>
 
         <div class="cam-viewport" id="viewportCam1">
-          <img id="streamCam1" src="/api/stream/video/1?source=fence.mp4" alt="CAM 1 Feed" />
+          <img id="streamCam1" src="/api/stream/video/1?source=fence.mp4" alt="CAM 1 Feed" onerror="setTimeout(() => { this.src = this.src.split('&_t=')[0] + '&_t=' + Date.now(); }, 500);" />
           <div class="corner-brackets"></div>
         </div>
 
@@ -1104,7 +1142,7 @@
         </div>
 
         <div class="cam-viewport" id="viewportCam2">
-          <img id="streamCam2" src="/api/stream/video/2?source=vehicle.mp4" alt="CAM 2 Feed" />
+          <img id="streamCam2" src="/api/stream/video/2?source=vehicle.mp4" alt="CAM 2 Feed" onerror="setTimeout(() => { this.src = this.src.split('&_t=')[0] + '&_t=' + Date.now(); }, 500);" />
           <div class="corner-brackets"></div>
         </div>
 
@@ -1141,7 +1179,7 @@
         </div>
 
         <div class="cam-viewport" id="viewportCam3">
-          <img id="streamCam3" src="/api/stream/video/3?source=sample.mp4" alt="CAM 3 Feed" />
+          <img id="streamCam3" src="/api/stream/video/3?source=sample.mp4" alt="CAM 3 Feed" onerror="setTimeout(() => { this.src = this.src.split('&_t=')[0] + '&_t=' + Date.now(); }, 500);" />
           <div class="corner-brackets"></div>
         </div>
 
@@ -1318,13 +1356,37 @@
       logEvent('UI', 'Switched to Tactical Focus Layout (1 Main + 2 Aux)', 'sys');
     });
 
-    // Camera Stream Controls
-    function reloadCam(camNum, imgId, selectId) {
+    // Tracking Trails Toggle Control
+    const checkShowTrails = document.getElementById('checkShowTrails');
+    if (checkShowTrails) {
+      checkShowTrails.addEventListener('change', async () => {
+        const isEnabled = checkShowTrails.checked;
+        logEvent('SETTINGS', `Tracking trails ${isEnabled ? 'ENABLED' : 'DISABLED'}`, isEnabled ? 'anpr' : 'sys');
+        try {
+          await fetch(`/api/settings/trails?enabled=${isEnabled}`, { method: 'POST' });
+        } catch (err) {
+          console.warn('Trails setting update error:', err);
+        }
+      });
+    }
+
+    // Camera Stream Controls with Dynamic Switching & Zero Blackout
+    async function reloadCam(camNum, imgId, selectId) {
       const select = document.getElementById(selectId);
       const img = document.getElementById(imgId);
       const src = select.value;
-      img.src = `/api/stream/video/${camNum}?source=${encodeURIComponent(src)}&_t=${Date.now()}`;
-      logEvent('STREAM', `CAM ${camNum} re-routed to: ${src}`, 'sys');
+      logEvent('STREAM', `CAM ${camNum} switching source to: ${src}...`, 'sys');
+
+      // 1. Hot-swap underlying source on the server so stream never freezes or breaks
+      try {
+        await fetch(`/api/stream/video/${camNum}/source?source=${encodeURIComponent(src)}`, { method: 'POST' });
+      } catch (err) {
+        console.warn('Dynamic source switch error:', err);
+      }
+
+      // 2. Refresh img.src with new source query param to guarantee instant update
+      const trailsParam = checkShowTrails && checkShowTrails.checked ? '&trails=true' : '&trails=false';
+      img.src = `/api/stream/video/${camNum}?source=${encodeURIComponent(src)}${trailsParam}&_t=${Date.now()}`;
     }
 
     // Bind source select changes

@@ -62,14 +62,18 @@ ALLOWED_CLASSES = {0: "PERSON", 2: "CAR", 3: "MOTORCYCLE", 5: "BUS", 7: "TRUCK"}
 VEHICLE_TYPES = {"CAR", "MOTORCYCLE", "BUS", "TRUCK"}
 
 BOX_COLORS = {
-    "PERSON": (0, 220, 255),       # Vibrant Cyan
-    "FACE": (0, 255, 185),         # Bright Mint
-    "CAR": (60, 220, 100),         # Emerald Green
-    "MOTORCYCLE": (60, 220, 100),  # Emerald Green
-    "BUS": (60, 220, 100),         # Emerald Green
-    "TRUCK": (60, 220, 100),       # Emerald Green
-    "PLATE": (255, 0, 255),        # Magenta / Purple
-    "BREACH": (0, 0, 255)          # Urgent Red
+    "PERSON": (0, 255, 0),                 # Pure Green for normal walking (untracked as threat)
+    "FACE": (0, 255, 185),                 # Bright Mint
+    "CAR": (60, 220, 100),                 # Emerald Green
+    "MOTORCYCLE": (60, 220, 100),          # Emerald Green
+    "BUS": (60, 220, 100),                 # Emerald Green
+    "TRUCK": (60, 220, 100),               # Emerald Green
+    "PLATE": (255, 0, 255),                # Magenta / Purple
+    "BREACH": (0, 0, 255),                 # Urgent Red
+    "CROUCHING": (0, 0, 255),              # Urgent Red
+    "CROUCHING/CRAWLING": (0, 0, 255),     # Urgent Red
+    "CLIMBING": (0, 0, 255),               # Urgent Red
+    "CLIMBING/JUMPING": (0, 0, 255)        # Urgent Red
 }
 
 SKELETON_CONNECTIONS = [
@@ -113,12 +117,13 @@ class ActivityEngine:
         fence_band_px: float = 35.0,
         confirm_frames: int = 2,
         breach_window_sec: float = 5.0,
-        max_match_distance: float = 95.0,
+        max_match_distance: float = 140.0,
         track_ttl: float = 4.0,
         history_sec: float = 8.0
     ):
         self.camera_id = camera_id
-        self.fence_line = fence_line
+        # Completely remove/disable static fence line for Camera 3
+        self.fence_line = None if camera_id in ("CAM_3", "3") else fence_line
         self.prot_poly = protected_polygon
         self.prot_sign = -1.0 if str(protected_side).upper() == "RIGHT" else 1.0
         self.spd_thresh = float(speed_threshold)
@@ -172,7 +177,7 @@ class ActivityEngine:
         t = {
             "id": self.next_id,
             "label": lbl,
-            "history": deque([(now, ctr, bbox, conf, kpts)], maxlen=80),
+            "history": deque(maxlen=80),
             "last_seen": now,
             "last_alert": {},
             "pre_side": False,
@@ -187,9 +192,11 @@ class ActivityEngine:
         return t
 
     def _get_track(self, lbl: str, ctr: Tuple[float, float], bbox: Tuple[int, int, int, int], conf: float, kpts: Any, now: float) -> Dict[str, Any]:
+        person_labels = {"PERSON", "CROUCHING/CRAWLING", "CLIMBING"}
         candidates = [
             t for t in self.tracks.values()
-            if t["label"] == lbl and now - t["last_seen"] <= self.track_ttl
+            if ((t["label"] == lbl) or (t["label"] in person_labels and lbl in person_labels))
+            and now - t["last_seen"] <= self.track_ttl
         ]
         if candidates:
             best = min(candidates, key=lambda t: self._dist(t["history"][-1][1], ctr))
@@ -221,7 +228,10 @@ class ActivityEngine:
         now = time.time() if now is None else now
         h, w = frame_shape
 
-        if self.fence_line is None:
+        # Camera 3 has no static fence line
+        if self.camera_id in ("CAM_3", "3"):
+            self.fence_line = None
+        elif self.fence_line is None:
             self.fence_line = ((0.0, float(h * 0.70)), (float(w), float(h * 0.70)))
 
         self.tracks = {k: v for k, v in self.tracks.items() if now - v["last_seen"] <= self.track_ttl}
@@ -229,10 +239,10 @@ class ActivityEngine:
 
         for det in detections:
             lbl = str(det.get("label", ""))
-            if lbl not in ALLOWED_CLASSES.values():
+            if lbl not in ALLOWED_CLASSES.values() and lbl not in ("CROUCHING/CRAWLING", "CLIMBING"):
                 continue
 
-            bbox = tuple(int(v) for v in det["bbox"])
+            bbox = tuple(int(v) for v in det["bbox"][:4])
             ctr = self._ctr(bbox)
             conf = float(det.get("conf", 0.0))
             kpts = det.get("keypoints")
@@ -247,91 +257,95 @@ class ActivityEngine:
             while track["history"] and now - track["history"][0][0] > self.hist_sec:
                 track["history"].popleft()
 
-            # Virtual fence crossing
-            if self.fence_line:
-                sd = self._sdist(ctr)
-                pd = sd * self.prot_sign
-                near = abs(sd) <= self.fence_band
-                prev = track["history"][-2] if len(track["history"]) >= 2 else None
+            # -------------------------------------------------------------
+            # DYNAMIC POSE BEHAVIOR (CROUCHING & CLIMBING/JUMPING)
+            # ZERO fence bounding-box intersection logic!
+            # ONLY trigger alerts and red boxes if pose estimation strictly
+            # detects 'Crouching' or 'Climbing/Jumping'.
+            # Normal walking remains green and untracked as a threat.
+            # -------------------------------------------------------------
+            if lbl in ("PERSON", "CROUCHING", "CROUCHING/CRAWLING", "CLIMBING", "CLIMBING/JUMPING"):
+                bw = bbox[2] - bbox[0]
+                bh = bbox[3] - bbox[1]
 
-                if pd < -self.fence_band:
-                    track["pre_side"] = True
-                if near and track["pre_side"]:
-                    track["near_seen"] = True
-                    if track["near_since"] is None:
-                        track["near_since"] = now
+                # 1. Crouching detection: bbox width > height and low posture
+                is_crouching = False
+                if bw > bh:
+                    if kpts is not None and len(kpts) >= 13:
+                        shoulders = [pt for idx, pt in enumerate(kpts) if idx in (5, 6) and (len(pt) < 3 or pt[2] > 0.40) and pt[1] > 0]
+                        hips = [pt for idx, pt in enumerate(kpts) if idx in (11, 12) and (len(pt) < 3 or pt[2] > 0.40) and pt[1] > 0]
+                        if shoulders and hips:
+                            avg_sh_y = sum(p[1] for p in shoulders) / len(shoulders)
+                            avg_hp_y = sum(p[1] for p in hips) / len(hips)
+                            torso_h = abs(avg_hp_y - avg_sh_y)
+                            if torso_h < (bw * 0.65) or avg_sh_y > (bbox[1] + bh * 0.35):
+                                is_crouching = True
+                        else:
+                            is_crouching = True
+                    else:
+                        is_crouching = True
 
-                rv_cue = rt_cue = False
-                if prev:
-                    dx = ctr[0] - prev[1][0]
-                    dy = ctr[1] - prev[1][1]
-                    ph = max(20, bbox[3] - bbox[1])
-                    pw = max(12, bbox[2] - bbox[0])
-                    rv_cue = dy < -0.22 * ph
-                    rt_cue = abs(dx) > max(35.0, 0.60 * pw)
-                    track["breach_cue"] = track["breach_cue"] or rv_cue or rt_cue
+                # 2. Climbing/Jumping detection: rapid upward y-axis movement of shoulders/hips
+                is_climbing = False
+                if len(track["history"]) >= 2:
+                    prev_obs = track["history"][-2]
+                    dt = max(1e-4, now - prev_obs[0])
+                    if dt < 1.2:
+                        pk, ck = prev_obs[4], kpts
+                        upward_velocities = []
+                        if pk is not None and ck is not None and len(pk) >= 13 and len(ck) >= 13:
+                            for j_idx in (5, 6, 11, 12):  # shoulders and hips
+                                if j_idx < len(pk) and j_idx < len(ck):
+                                    p_pt, c_pt = pk[j_idx], ck[j_idx]
+                                    p_conf = p_pt[2] if len(p_pt) >= 3 else 1.0
+                                    c_conf = c_pt[2] if len(c_pt) >= 3 else 1.0
+                                    if p_conf > 0.40 and c_conf > 0.40 and p_pt[1] > 0 and c_pt[1] > 0:
+                                        dy = c_pt[1] - p_pt[1]  # negative = upward motion
+                                        vel_y = dy / dt         # px/s
+                                        upward_velocities.append(vel_y)
 
-                if pd > self.fence_band:
-                    track["confirm_cnt"] += 1
-                else:
-                    track["confirm_cnt"] = 0
+                        if upward_velocities:
+                            if min(upward_velocities) < -100.0:
+                                is_climbing = True
+                        else:
+                            dy = ctr[1] - prev_obs[1][1]
+                            vel_y = dy / dt
+                            if vel_y < -120.0:
+                                is_climbing = True
 
-                confirmed = (
-                    pd > self.fence_band
-                    and track["near_seen"]
-                    and track["pre_side"]
-                    and track["near_since"] is not None
-                    and now - track["near_since"] <= self.breach_win
-                    and track["confirm_cnt"] >= self.confirm_frm
-                )
-
-                if confirmed and self._can_alert(track, "FENCE_BREACH", now, 8.0):
-                    kind = "JUMP/CLIMB BREACH" if rv_cue else "CONFIRMED FENCE BREACH"
-                    reason = ("Entry confirmed with upward jump kinematics." if rv_cue
-                              else "Confirmed perimeter breach across virtual fence line.")
-                    alerts.append(self._alert(track, kind, "RED", reason, now, {
-                        "signed_dist_px": round(sd, 1),
-                        "bbox": bbox,
-                        "confirm_frames": track["confirm_cnt"]
-                    }))
-                    track.update(near_seen=False, pre_side=False, near_since=None, confirm_cnt=0, breach_cue=False)
-                    track["flash_until"] = now + 5.0
-
-            # Skeletal Climbing Kinematics
-            is_near_fence = self.fence_line and abs(self._sdist(ctr)) <= self.fence_band * 3.5
-            if is_near_fence and len(track["history"]) >= 3:
-                prev_obs = track["history"][-3]
-                curr_obs = track["history"][-1]
-
-                pk, ck = prev_obs[4], curr_obs[4]
-                if pk is not None and ck is not None and len(pk) >= 17 and len(ck) >= 17:
-                    l_ankle_dy = ck[15][1] - pk[15][1]
-                    r_ankle_dy = ck[16][1] - pk[16][1]
-                    l_wrist_dy = ck[9][1] - pk[9][1]
-                    r_wrist_dy = ck[10][1] - pk[10][1]
-                    ph = max(20, curr_obs[2][3] - curr_obs[2][1])
-
-                    if min(l_ankle_dy, r_ankle_dy, l_wrist_dy, r_wrist_dy) < -0.15 * ph:
-                        if self._can_alert(track, "CLIMBING", now, 8.0):
-                            alerts.append(self._alert(
-                                track, "SKELETAL CLIMBING DETECTED", "RED",
-                                "Target exhibiting upward limb climbing kinetics near perimeter fence.",
-                                now, {"dy_wrist": round(float(min(l_wrist_dy, r_wrist_dy)), 1)}
-                            ))
-                            track["flash_until"] = now + 5.0
-                else:
-                    dy = ctr[1] - prev_obs[1][1]
-                    ph = max(20, bbox[3] - bbox[1])
-                    if dy < -0.20 * ph and self._can_alert(track, "CLIMBING", now, 8.0):
+                if is_crouching:
+                    det["label"] = "CROUCHING"
+                    det["pose_behavior"] = "Crouching"
+                    det["alert"] = True
+                    track["flash_until"] = now + 4.0
+                    if self._can_alert(track, "CROUCHING", now, cd=4.0):
                         alerts.append(self._alert(
-                            track, "VERTICAL CLIMBING DETECTED", "RED",
-                            "Upward vertical velocity surge near fence indicates scaling or climbing.",
-                            now, {"dy": round(dy, 1)}
+                            track, "CROUCHING ALERT", "RED",
+                            "Target exhibiting low posture crouching movement.",
+                            now, {"bbox": bbox, "bw": bw, "bh": bh}
                         ))
-                        track["flash_until"] = now + 5.0
+                elif is_climbing:
+                    det["label"] = "CLIMBING/JUMPING"
+                    det["pose_behavior"] = "Climbing/Jumping"
+                    det["alert"] = True
+                    track["flash_until"] = now + 4.0
+                    if self._can_alert(track, "CLIMBING", now, cd=4.0):
+                        alerts.append(self._alert(
+                            track, "CLIMBING/JUMPING ALERT", "RED",
+                            "Rapid upward y-axis movement of shoulders/hips indicates climbing or jumping.",
+                            now, {"bbox": bbox, "dt": round(dt, 3)}
+                        ))
+                else:
+                    # Normal walking: keep green, unflagged, and untracked as threat
+                    det["label"] = "PERSON"
+                    det["pose_behavior"] = None
+                    det["alert"] = False
+                    track["flash_until"] = 0.0
 
-            if now <= track.get("flash_until", 0.0):
+            if now <= track.get("flash_until", 0.0) and det.get("pose_behavior"):
                 det["alert"] = True
+            elif lbl == "PERSON":
+                det["alert"] = False
 
         return alerts
 
@@ -426,6 +440,15 @@ class IBVAPSurveillanceEngine:
             "CAM_3": ActivityEngine(camera_id="CAM_3"),
         }
 
+        # Active Camera Sources for Dynamic Switching
+        self.camera_sources: Dict[str, str] = {
+            "CAM_1": "fence.mp4",
+            "CAM_2": "vehicle.mp4",
+            "CAM_3": "sample.mp4",
+        }
+        # Motion trails visibility toggle (default False to keep car tracking clean)
+        self.show_trails: bool = False
+
         # Telemetry Cache & ANPR Registry
         self.telemetry_lock = threading.Lock()
         self.recent_plates: deque = deque(maxlen=60)
@@ -461,12 +484,37 @@ class IBVAPSurveillanceEngine:
         except Exception as e:
             logger.warning(f"GPU warmup notice: {e}")
 
+    @staticmethod
+    def resolve_video_path(source: Union[int, str]) -> Union[int, str]:
+        """Resolves camera index or local file path robustly."""
+        if isinstance(source, int):
+            return source
+        s = str(source).strip()
+        if s.isdigit():
+            return int(s)
+        if not os.path.isabs(s):
+            cand = os.path.join(BASE_DIR, s)
+            if os.path.exists(cand):
+                return cand
+        return s
+
+    def set_camera_source(self, cam_id: str, source: str) -> str:
+        """Set active video source for a camera ID (supports '1' or 'CAM_1')."""
+        key = f"CAM_{str(cam_id).replace('CAM_', '')}"
+        self.camera_sources[key] = str(source)
+        return key
+
+    def get_camera_source(self, cam_id: str) -> str:
+        """Get active video source for a camera ID (supports '1' or 'CAM_1')."""
+        key = f"CAM_{str(cam_id).replace('CAM_', '')}"
+        return self.camera_sources.get(key, "fence.mp4")
+
     def process_frame(
         self,
         frame: np.ndarray,
         camera_id: str = "CAM_1",
         conf_thresh: float = 0.38,
-        imgsz: int = 480,
+        imgsz: int = 640,
         enable_ocr: bool = True,
         enable_face: bool = True,
         enable_bla: bool = True
@@ -517,7 +565,20 @@ class IBVAPSurveillanceEngine:
                     kpts_list = None
                     if keypoints_data is not None and keypoints_data.xy is not None and len(keypoints_data.xy) > i:
                         xy = keypoints_data.xy[i].cpu().numpy()
-                        kpts_list = [(round(float(kx), 1), round(float(ky), 1)) for kx, ky in xy]
+                        confs = None
+                        if hasattr(keypoints_data, "conf") and keypoints_data.conf is not None and len(keypoints_data.conf) > i:
+                            confs = keypoints_data.conf[i].cpu().numpy()
+
+                        if confs is not None:
+                            kpts_list = [
+                                (round(float(kx), 1), round(float(ky), 1), round(float(kc), 3))
+                                for (kx, ky), kc in zip(xy, confs)
+                            ]
+                        else:
+                            kpts_list = [
+                                (round(float(kx), 1), round(float(ky), 1), 1.0)
+                                for kx, ky in xy
+                            ]
 
                     detections.append({
                         "label": "PERSON",
@@ -775,19 +836,20 @@ class IBVAPSurveillanceEngine:
         detections: List[Dict[str, Any]],
         camera_id: str = "CAM_1",
         draw_skeletons: bool = True,
-        draw_bla: bool = True
+        draw_bla: bool = True,
+        draw_trails: Optional[bool] = None
     ) -> np.ndarray:
         """
         Render visual overlays: bounding boxes, vehicle tags, plates,
-        skeletons, virtual fence tripwire, and breach motion trails.
+        skeletons, virtual fence tripwire, and optional breach motion trails.
         """
         annotated = frame.copy()
         h, w = annotated.shape[:2]
 
         bla_engine = self.bla_engines.get(camera_id, self.bla_engines.get("CAM_1"))
 
-        # 1. Virtual Fence Tripwire
-        if draw_bla and bla_engine and bla_engine.fence_line:
+        # 1. Virtual Fence Tripwire (Never rendered for Camera 3)
+        if draw_bla and bla_engine and bla_engine.fence_line and camera_id not in ("CAM_3", "3"):
             fa, fb = bla_engine.fence_line
             p1 = (int(fa[0]), int(fa[1]))
             p2 = (int(fb[0]), int(fb[1]))
@@ -797,8 +859,9 @@ class IBVAPSurveillanceEngine:
             cv2.putText(annotated, "VIRTUAL FENCE TRIPWIRE", mid,
                         cv2.FONT_HERSHEY_SIMPLEX, 0.44, (0, 0, 255), 2, cv2.LINE_AA)
 
-        # 2. Motion Trails
-        if draw_bla and bla_engine:
+        # 2. Motion Trails (Only rendered when explicitly enabled via UI toggle)
+        effective_draw_trails = self.show_trails if draw_trails is None else draw_trails
+        if effective_draw_trails and draw_bla and bla_engine:
             for track in bla_engine.tracks.values():
                 history = list(track.get("history", []))
                 if len(history) >= 2:
@@ -810,28 +873,37 @@ class IBVAPSurveillanceEngine:
 
         # 3. Detections
         for det in detections:
-            x1, y1, x2, y2 = det["bbox"]
+            x1, y1, x2, y2 = [int(v) for v in det["bbox"][:4]]
             label = det["label"]
             conf = det["conf"]
             is_alert = det.get("alert", False)
+            pose_behavior = det.get("pose_behavior")
 
-            if is_alert:
-                box_color = BOX_COLORS["BREACH"]
+            # ONLY trigger alerts and red boxes if pose estimation strictly detects 'Crouching' or 'Climbing/Jumping'
+            if pose_behavior in ("Crouching", "Crouching/Crawling"):
+                box_color = (0, 0, 255)  # Red alert
+                tag = f"CROUCHING ALERT {int(conf * 100)}%"
+                is_alert = True
+            elif pose_behavior in ("Climbing", "Climbing/Jumping"):
+                box_color = (0, 0, 255)  # Red alert
+                tag = f"CLIMBING ALERT {int(conf * 100)}%"
+                is_alert = True
+            elif is_alert:
+                box_color = (0, 0, 255)
                 tag = f"BREACH DETECTED {int(conf * 100)}%"
             elif label == "PLATE":
                 box_color = BOX_COLORS["PLATE"]
                 plate_val = (det.get("plate") or "").strip()
-                if plate_val and plate_val != "PLATE DETECTED":
-                    tag = f"PLATE: {plate_val}"
-                elif plate_val:
-                    tag = plate_val
-                else:
-                    tag = f"PLATE {int(conf * 100)}%"
+                tag = f"PLATE: {plate_val}" if plate_val and plate_val != "PLATE DETECTED" else (plate_val or f"PLATE {int(conf * 100)}%")
+            elif label == "PERSON":
+                # Normal walking must remain green and untracked as a threat, regardless of where they are on the screen
+                box_color = (0, 255, 0)  # Pure Green
+                tag = f"PERSON {conf:.2f}"
             else:
-                box_color = BOX_COLORS.get(label, (255, 255, 255))
+                box_color = BOX_COLORS.get(label, (60, 220, 100))
                 tag = f"{label} {conf:.2f}"
 
-            thickness = 3 if is_alert or label == "PLATE" else 2
+            thickness = 3 if (is_alert or label == "PLATE") else 2
             cv2.rectangle(annotated, (x1, y1), (x2, y2), box_color, thickness)
 
             # Label banner
@@ -844,19 +916,26 @@ class IBVAPSurveillanceEngine:
                 tag_y1 = y2
                 text_y = y2 + th + 4
                 cv2.rectangle(annotated, (x1, tag_y1), (x1 + tw + 6, y2 + th + 6), box_color, -1)
-            text_color = (255, 255, 255) if is_alert or label == "PLATE" else (10, 10, 10)
+            text_color = (255, 255, 255) if (is_alert or label == "PLATE") else (10, 10, 10)
             cv2.putText(annotated, tag, (x1 + 3, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, text_color, 1, cv2.LINE_AA)
 
-            # 4. Draw 17-Point Pose Skeleton
+            # 4. Draw 17-Point Pose Skeleton (Conf > 0.65 filter to eliminate ghost keypoints)
             if draw_skeletons and det.get("keypoints") is not None:
                 kpts = det["keypoints"]
                 pt_map: Dict[int, Tuple[int, int]] = {}
-                for idx, (kx, ky) in enumerate(kpts):
-                    if kx > 0 and ky > 0:
+                for idx, pt in enumerate(kpts):
+                    if len(pt) >= 3:
+                        kx, ky, k_conf = pt[0], pt[1], pt[2]
+                    else:
+                        kx, ky, k_conf = pt[0], pt[1], 1.0
+
+                    # Filter: ONLY keep keypoints with confidence > 0.65 and inside frame
+                    if k_conf > 0.65 and kx > 0 and ky > 0:
                         px, py = int(kx), int(ky)
                         pt_map[idx] = (px, py)
                         cv2.circle(annotated, (px, py), 4, (0, 255, 255), -1)
 
+                # Skeletal lines ONLY drawn if BOTH keypoints have conf > 0.65
                 for p1_id, p2_id in SKELETON_CONNECTIONS:
                     if p1_id in pt_map and p2_id in pt_map:
                         cv2.line(annotated, pt_map[p1_id], pt_map[p2_id], (255, 105, 180), 2, cv2.LINE_AA)
@@ -871,65 +950,103 @@ class IBVAPSurveillanceEngine:
         draw_overlay: bool = True,
         enable_ocr: bool = True,
         enable_face: bool = True,
-        enable_bla: bool = True
+        enable_bla: bool = True,
+        draw_trails: Optional[bool] = None
     ) -> Generator[bytes, None, None]:
-        """Continuous MJPEG stream generator for a single camera feed."""
-        if isinstance(source, str):
-            if source.isdigit():
-                resolved_source: Union[int, str] = int(source)
-            elif not os.path.isabs(source):
-                cand = os.path.join(BASE_DIR, source)
-                resolved_source = cand if os.path.exists(cand) else source
-            else:
-                resolved_source = source
-        else:
-            resolved_source = source
+        """Continuous, robust MJPEG stream generator with dynamic source switching, seamless looping, and frame-skipping."""
+        active_source = str(source)
+        self.camera_sources[camera_id] = active_source
+        resolved_source = self.resolve_video_path(active_source)
 
         cap = cv2.VideoCapture(resolved_source)
         if not cap.isOpened():
-            logger.error(f"Cannot open stream source: {resolved_source}")
-            err_img = np.zeros((360, 640, 3), dtype=np.uint8)
-            cv2.putText(err_img, f"FEED OFFLINE: {camera_id}", (190, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2, cv2.LINE_AA)
-            cv2.putText(err_img, f"Source: {source}", (170, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1, cv2.LINE_AA)
-            cv2.putText(err_img, "Check camera connection or video filename", (130, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (140, 140, 140), 1, cv2.LINE_AA)
-            ret_err, err_buf = cv2.imencode(".jpg", err_img, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-            if ret_err:
-                yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + err_buf.tobytes() + b"\r\n")
-            return
+            logger.warning(f"Initial stream source {resolved_source} failed, attempting fallback...")
+            fallback_name = CAMERA_CONFIGS.get(camera_id.replace("CAM_", ""), {}).get("default_source", "fence.mp4")
+            resolved_source = self.resolve_video_path(fallback_name)
+            cap = cv2.VideoCapture(resolved_source)
 
         fps_tracker = deque(maxlen=15)
+        total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) if cap.isOpened() else 0
+        frame_count = 0
+        last_valid_frame: Optional[np.ndarray] = None
+        last_results: Dict[str, Any] = {
+            "detections": [],
+            "inference_time_ms": 0.0,
+            "target_count": 0,
+            "breach_alerts": []
+        }
 
         try:
             while True:
                 f_start = time.perf_counter()
+
+                # Dynamic Video Source Switching: check if user changed dropdown
+                current_target_source = self.camera_sources.get(camera_id, active_source)
+                if current_target_source != active_source:
+                    logger.info(f"Dynamically switching {camera_id} source from '{active_source}' to '{current_target_source}'")
+                    new_resolved = self.resolve_video_path(current_target_source)
+                    new_cap = cv2.VideoCapture(new_resolved)
+                    if new_cap.isOpened():
+                        cap.release()
+                        cap = new_cap
+                        active_source = current_target_source
+                        resolved_source = new_resolved
+                        total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+                        frame_count = 0
+                        last_results = {"detections": [], "inference_time_ms": 0.0, "target_count": 0, "breach_alerts": []}
+                    else:
+                        logger.warning(f"Could not open target source: {new_resolved}")
+                        self.camera_sources[camera_id] = active_source
+
+                # Seamless Looping: Proactively rewind when nearing EOF
+                if total_frames > 0:
+                    curr_pos = cap.get(cv2.CAP_PROP_POS_FRAMES)
+                    if curr_pos >= (total_frames - 2):
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
                 ret, frame = cap.read()
                 if not ret or frame is None:
-                    # Seamless Video Looping: reset back to beginning on EOF so stream never goes black
+                    # Video ended or read failed: rewind and re-read
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     ret, frame = cap.read()
                     if not ret or frame is None:
-                        cap.open(resolved_source)
+                        # Re-open capture to recover from decoder EOF state
+                        cap.release()
+                        cap = cv2.VideoCapture(resolved_source)
                         ret, frame = cap.read()
+
+                    # Fallback to previous valid frame during momentary reopen so feed never blackouts
                     if not ret or frame is None:
-                        time.sleep(0.025)
-                        continue
+                        if last_valid_frame is not None:
+                            frame = last_valid_frame.copy()
+                        else:
+                            time.sleep(0.02)
+                            continue
+                else:
+                    last_valid_frame = frame.copy()
+
+                frame_count += 1
 
                 if draw_overlay:
-                    results = self.process_frame(
-                        frame,
-                        camera_id=camera_id,
-                        conf_thresh=conf_thresh,
-                        imgsz=480,
-                        enable_ocr=enable_ocr,
-                        enable_face=enable_face,
-                        enable_bla=enable_bla
-                    )
+                    # Dynamic Frame Skipping: run AI inference every 2nd frame (frame_count % 2 == 0)
+                    if frame_count % 2 == 0 or frame_count == 1 or not last_results.get("detections"):
+                        last_results = self.process_frame(
+                            frame,
+                            camera_id=camera_id,
+                            conf_thresh=conf_thresh,
+                            imgsz=640,
+                            enable_ocr=enable_ocr,
+                            enable_face=enable_face,
+                            enable_bla=enable_bla
+                        )
+
                     annotated_frame = self.draw_overlays(
                         frame,
-                        results["detections"],
+                        last_results.get("detections", []),
                         camera_id=camera_id,
                         draw_skeletons=True,
-                        draw_bla=enable_bla
+                        draw_bla=enable_bla,
+                        draw_trails=draw_trails
                     )
 
                     f_time = time.perf_counter() - f_start
@@ -939,25 +1056,22 @@ class IBVAPSurveillanceEngine:
                     with self.telemetry_lock:
                         self.latest_telemetry["fps"] = curr_fps
 
-                    # Telemetry HUD on video frame
                     cam_label = CAMERA_CONFIGS.get(camera_id.replace("CAM_", ""), {}).get("label", camera_id)
-                    hud_text = f"{cam_label} | GPU: {self.device_name} | {curr_fps} FPS | {results['inference_time_ms']}ms"
+                    hud_text = f"{cam_label} | GPU: {self.device_name} | {curr_fps} FPS | {last_results.get('inference_time_ms', 0)}ms"
                     cv2.putText(annotated_frame, hud_text, (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 0), 2, cv2.LINE_AA)
                 else:
                     annotated_frame = frame
 
-                # Mobile bandwidth optimization: limit width to 854px
                 if annotated_frame.shape[1] > 854:
                     scale = 854.0 / annotated_frame.shape[1]
                     annotated_frame = cv2.resize(annotated_frame, (854, int(annotated_frame.shape[0] * scale)), interpolation=cv2.INTER_AREA)
 
-                # Compress using JPEG quality 70 to minimize mobile network bandwidth
                 ret_enc, buffer = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
                 if not ret_enc:
                     continue
 
                 yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
-                time.sleep(0.025)
+                time.sleep(0.015)
 
         finally:
             cap.release()
@@ -965,7 +1079,8 @@ class IBVAPSurveillanceEngine:
     def generate_mosaic_stream(
         self,
         sources: Tuple[str, str, str] = ("fence.mp4", "vehicle.mp4", "sample.mp4"),
-        conf_thresh: float = 0.38
+        conf_thresh: float = 0.38,
+        draw_trails: Optional[bool] = None
     ) -> Generator[bytes, None, None]:
         """
         High-performance stitched 3-camera mosaic generator.
@@ -973,19 +1088,30 @@ class IBVAPSurveillanceEngine:
         """
         caps = []
         last_mosaic_frames: List[Optional[np.ndarray]] = []
+        mosaic_results: Dict[int, Dict[str, Any]] = {}
         for s in sources:
-            resolved = os.path.join(BASE_DIR, s) if not os.path.isabs(s) else s
+            resolved = self.resolve_video_path(s)
             c = cv2.VideoCapture(resolved)
             caps.append(c)
             last_mosaic_frames.append(None)
 
         target_w, target_h = 426, 240  # 3 x 426 = 1278 wide
+        mosaic_frame_count = 0
 
         try:
             while True:
                 frames = []
+                mosaic_frame_count += 1
                 for idx, c in enumerate(caps):
                     cam_key = str(idx + 1)
+                    cam_id_str = f"CAM_{cam_key}"
+
+                    total_f = c.get(cv2.CAP_PROP_FRAME_COUNT)
+                    if total_f > 0:
+                        cpos = c.get(cv2.CAP_PROP_POS_FRAMES)
+                        if cpos >= (total_f - 2):
+                            c.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
                     ret, fr = c.read()
                     if not ret or fr is None:
                         # Seamless Video Looping for mosaic feeds
@@ -993,8 +1119,10 @@ class IBVAPSurveillanceEngine:
                         ret, fr = c.read()
                         if not ret or fr is None:
                             src_cand = sources[idx]
-                            res_cand = os.path.join(BASE_DIR, src_cand) if not os.path.isabs(src_cand) else src_cand
-                            c.open(res_cand)
+                            res_cand = self.resolve_video_path(src_cand)
+                            c.release()
+                            c = cv2.VideoCapture(res_cand)
+                            caps[idx] = c
                             ret, fr = c.read()
 
                     if not ret or fr is None:
@@ -1005,9 +1133,14 @@ class IBVAPSurveillanceEngine:
                     else:
                         last_mosaic_frames[idx] = fr.copy()
 
-                    # Process on GPU
-                    res = self.process_frame(fr, camera_id=f"CAM_{cam_key}", conf_thresh=conf_thresh, imgsz=384)
-                    fr = self.draw_overlays(fr, res["detections"], camera_id=f"CAM_{cam_key}")
+                    # Dynamic frame skipping in mosaic: process inference every 2nd frame
+                    if mosaic_frame_count % 2 == 0 or idx not in mosaic_results:
+                        res = self.process_frame(fr, camera_id=cam_id_str, conf_thresh=conf_thresh, imgsz=480)
+                        mosaic_results[idx] = res
+                    else:
+                        res = mosaic_results[idx]
+
+                    fr = self.draw_overlays(fr, res.get("detections", []), camera_id=cam_id_str, draw_trails=draw_trails)
                     fr = cv2.resize(fr, (target_w, target_h))
 
                     # Add camera label header
@@ -1029,7 +1162,7 @@ class IBVAPSurveillanceEngine:
                     continue
 
                 yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
-                time.sleep(0.033)
+                time.sleep(0.018)
 
         finally:
             for c in caps:
@@ -1259,7 +1392,8 @@ def stream_camera_1(
     overlay: bool = Query(True),
     ocr: bool = Query(True),
     face: bool = Query(True),
-    bla: bool = Query(True)
+    bla: bool = Query(True),
+    trails: Optional[bool] = Query(None, description="Show tracking trails overlay")
 ):
     """Camera 1 Feed: Hawkins Post (Default: fence.mp4)."""
     engine: IBVAPSurveillanceEngine = getattr(app.state, "engine", None)
@@ -1268,7 +1402,8 @@ def stream_camera_1(
 
     return StreamingResponse(
         engine.generate_mjpeg_stream(source=source, camera_id="CAM_1", conf_thresh=conf_thresh,
-                                     draw_overlay=overlay, enable_ocr=ocr, enable_face=face, enable_bla=bla),
+                                     draw_overlay=overlay, enable_ocr=ocr, enable_face=face, enable_bla=bla,
+                                     draw_trails=trails),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
@@ -1280,7 +1415,8 @@ def stream_camera_2(
     overlay: bool = Query(True),
     ocr: bool = Query(True),
     face: bool = Query(True),
-    bla: bool = Query(True)
+    bla: bool = Query(True),
+    trails: Optional[bool] = Query(None, description="Show tracking trails overlay")
 ):
     """Camera 2 Feed: Out Post (Default: vehicle.mp4 - ANPR Vehicle Checkpoint)."""
     engine: IBVAPSurveillanceEngine = getattr(app.state, "engine", None)
@@ -1289,7 +1425,8 @@ def stream_camera_2(
 
     return StreamingResponse(
         engine.generate_mjpeg_stream(source=source, camera_id="CAM_2", conf_thresh=conf_thresh,
-                                     draw_overlay=overlay, enable_ocr=ocr, enable_face=face, enable_bla=bla),
+                                     draw_overlay=overlay, enable_ocr=ocr, enable_face=face, enable_bla=bla,
+                                     draw_trails=trails),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
@@ -1301,7 +1438,8 @@ def stream_camera_3(
     overlay: bool = Query(True),
     ocr: bool = Query(True),
     face: bool = Query(True),
-    bla: bool = Query(True)
+    bla: bool = Query(True),
+    trails: Optional[bool] = Query(None, description="Show tracking trails overlay")
 ):
     """Camera 3 Feed: Alpha Post (Default: sample.mp4 - Aerial/Perimeter Patrol)."""
     engine: IBVAPSurveillanceEngine = getattr(app.state, "engine", None)
@@ -1310,7 +1448,8 @@ def stream_camera_3(
 
     return StreamingResponse(
         engine.generate_mjpeg_stream(source=source, camera_id="CAM_3", conf_thresh=conf_thresh,
-                                     draw_overlay=overlay, enable_ocr=ocr, enable_face=face, enable_bla=bla),
+                                     draw_overlay=overlay, enable_ocr=ocr, enable_face=face, enable_bla=bla,
+                                     draw_trails=trails),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
@@ -1320,7 +1459,8 @@ def stream_mosaic(
     cam1_src: str = Query("fence.mp4"),
     cam2_src: str = Query("vehicle.mp4"),
     cam3_src: str = Query("sample.mp4"),
-    conf_thresh: float = Query(0.38)
+    conf_thresh: float = Query(0.38),
+    trails: Optional[bool] = Query(None)
 ):
     """Combined 3-Camera Mosaic Feed: stitched side-by-side."""
     engine: IBVAPSurveillanceEngine = getattr(app.state, "engine", None)
@@ -1328,9 +1468,38 @@ def stream_mosaic(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Engine not ready")
 
     return StreamingResponse(
-        engine.generate_mosaic_stream(sources=(cam1_src, cam2_src, cam3_src), conf_thresh=conf_thresh),
+        engine.generate_mosaic_stream(sources=(cam1_src, cam2_src, cam3_src), conf_thresh=conf_thresh, draw_trails=trails),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
+
+
+@app.post("/api/stream/video/{cam_id}/source", tags=["Streaming"])
+@app.get("/api/stream/video/{cam_id}/source", tags=["Streaming"])
+async def set_camera_source(cam_id: str, source: str = Query(..., description="Target video filename or device index")):
+    """Dynamically switch video source for a camera without breaking the generator or freezing."""
+    engine: IBVAPSurveillanceEngine = getattr(app.state, "engine", None)
+    if not engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Engine not ready")
+
+    key = f"CAM_{cam_id.replace('CAM_', '')}"
+    engine.camera_sources[key] = source
+    logger.info(f"Dynamically updated source for {key} to: {source}")
+    return {"status": "ok", "camera_id": key, "source": source}
+
+
+@app.post("/api/settings/trails", tags=["Settings"])
+@app.get("/api/settings/trails", tags=["Settings"])
+async def toggle_tracking_trails(enabled: Optional[bool] = Query(None, description="Enable or disable tracking trails")):
+    """Toggle tracking trails overlay on and off."""
+    engine: IBVAPSurveillanceEngine = getattr(app.state, "engine", None)
+    if not engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Engine not ready")
+
+    if enabled is not None:
+        engine.show_trails = bool(enabled)
+        logger.info(f"Tracking trails overlay toggled to: {engine.show_trails}")
+
+    return {"status": "ok", "show_trails": engine.show_trails}
 
 
 @app.get("/api/video-sources", tags=["Streaming"])
