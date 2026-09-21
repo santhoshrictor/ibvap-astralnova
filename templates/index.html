@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IBVAP - Intelligent Border Video Analytics Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      /* Tactical Cyber Theme Colors */
+      --ac: #00d4ff;
+      --ac-lo: rgba(0, 212, 255, 0.12);
+      --ac-gl: rgba(0, 212, 255, 0.28);
+
+      --rd: #ff3d3d;
+      --rd-lo: rgba(255, 61, 61, 0.12);
+      --rd-gl: rgba(255, 61, 61, 0.35);
+
+      --am: #ffaa00;
+      --am-lo: rgba(255, 170, 0, 0.12);
+      --am-gl: rgba(255, 170, 0, 0.28);
+
+      --gn: #00e887;
+      --gn-lo: rgba(0, 232, 135, 0.12);
+      --gn-gl: rgba(0, 232, 135, 0.30);
+
+      --pu: #c084fc;
+      --pu-lo: rgba(192, 132, 252, 0.14);
+
+      --bg: #050a10;
+      --bg-surface: #0a111c;
+      --bg-surface-elevated: #0e1828;
+      --card: rgba(11, 18, 28, 0.94);
+
+      --bd: rgba(0, 212, 255, 0.12);
+      --bd-hi: rgba(0, 212, 255, 0.32);
+
+      --tx: #bdd4e0;
+      --tx-bright: #ffffff;
+      --dm: #466c7f;
+
+      --mo: 'JetBrains Mono', 'Consolas', monospace;
+      --ui: 'Inter', system-ui, sans-serif;
+      --title: 'Outfit', sans-serif;
+
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+
+      --transition: all 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(rgba(0, 212, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 212, 255, 0.025) 1px, transparent 1px),
+        radial-gradient(ellipse 80% 35% at 50% 0%, rgba(0, 212, 255, 0.06), transparent 70%);
+      background-size: 30px 30px, 30px 30px, 100% 100%;
+      color: var(--tx);
+      font-family: var(--ui);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--bd-hi); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ac); }
+
+    /* Tactical Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 2rem;
+      background: rgba(6, 11, 18, 0.90);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--bd-hi);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-shield {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 232, 135, 0.15));
+      border: 1px solid var(--ac);
+      box-shadow: 0 0 16px var(--ac-gl);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-shield svg {
+      width: 26px;
+      height: 26px;
+      fill: none;
+      stroke: var(--ac);
+      stroke-width: 2;
+    }
+
+    .brand-title {
+      font-family: var(--mo);
+      font-weight: 800;
+      font-size: 1.35rem;
+      letter-spacing: 2px;
+      color: var(--ac);
+      text-shadow: 0 0 18px var(--ac-gl);
+      line-height: 1.1;
+    }
+
+    .brand-sub {
+      font-family: var(--mo);
+      font-size: 0.62rem;
+      color: var(--dm);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .header-chips {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .t-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--mo);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 0.35rem 0.85rem;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-full);
+      color: var(--tx);
+    }
+
+    .dot-live {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--gn);
+      box-shadow: 0 0 8px var(--gn);
+      animation: pulseLive 1.6s infinite;
+    }
+
+    @keyframes pulseLive {
+      0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 232, 135, 0.7); }
+      70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(0, 232, 135, 0); }
+      100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 232, 135, 0); }
+    }
+
+    .btn-hdr {
+      text-decoration: none;
+      font-family: var(--mo);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--tx);
+      background: rgba(0, 212, 255, 0.05);
+      border: 1px solid var(--bd);
+      padding: 0.38rem 0.8rem;
+      border-radius: var(--radius-sm);
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-hdr:hover {
+      background: var(--ac-lo);
+      border-color: var(--ac);
+      color: var(--ac);
+      box-shadow: 0 0 12px var(--ac-gl);
+    }
+
+    /* Container */
+    .container {
+      max-width: 1780px;
+      margin: 0 auto;
+      padding: 1.25rem 2rem 2.5rem;
+    }
+
+    /* Tactical Command Bar */
+    .cmd-bar {
+      display: flex;
+      border: 1px solid var(--bd-hi);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.04), rgba(0, 0, 0, 0.5));
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .cmd-item {
+      flex: 1;
+      padding: 0.65rem 1rem;
+      border-right: 1px solid var(--bd);
+      font-family: var(--mo);
+      min-width: 0;
+    }
+
+    .cmd-item:last-child {
+      border-right: none;
+    }
+
+    .cmd-lbl {
+      display: block;
+      font-size: 0.54rem;
+      letter-spacing: 2px;
+      color: var(--dm);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .cmd-val {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.80rem;
+      font-weight: 700;
+      color: var(--ac);
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .cmd-val.armed {
+      color: var(--gn);
+      text-shadow: 0 0 8px rgba(0, 232, 135, 0.4);
+    }
+
+    .cmd-val.breach {
+      color: var(--rd);
+      text-shadow: 0 0 10px rgba(255, 61, 61, 0.6);
+      animation: alertPulse 1.2s infinite;
+    }
+
+    @keyframes alertPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* 6-Item Tactical Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    @media (max-width: 1300px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .scard {
+      background: var(--card);
+      border: 1px solid var(--bd);
+      border-top: 3px solid var(--ac);
+      border-radius: var(--radius-md);
+      padding: 0.75rem 1rem;
+      font-family: var(--mo);
+      position: relative;
+      overflow: hidden;
+      cursor: default;
+      transition: var(--transition);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+    }
+
+    .scard:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 212, 255, 0.12);
+      border-color: var(--bd-hi);
+    }
+
+    .scard.r { border-top-color: var(--rd); }
+    .scard.a { border-top-color: var(--am); }
+    .scard.g { border-top-color: var(--gn); }
+    .scard.p { border-top-color: var(--pu); }
+
+    .scard-lbl {
+      font-size: 0.54rem;
+      letter-spacing: 1.8px;
+      color: var(--dm);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .scard-num {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--ac);
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .scard.r .scard-num { color: var(--rd); }
+    .scard.a .scard-num { color: var(--am); }
+    .scard.g .scard-num { color: var(--gn); }
+    .scard.p .scard-num { color: var(--pu); }
+
+    .scard-sub {
+      font-size: 0.58rem;
+      color: var(--tx);
+      margin-top: 3px;
+      opacity: 0.8;
+      letter-spacing: 0.5px;
+    }
+
+    /* Layout Toolbar (Switch between 3-Column Grid, 1 Main + 2 Side, Mosaic) */
+    .layout-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.85rem;
+      padding: 0.5rem 0.85rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-md);
+    }
+
+    .sec-hd {
+      font-family: var(--mo);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #7abdd6;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .sec-hd::before {
+      content: '';
+      width: 3px;
+      height: 12px;
+      background: var(--ac);
+      box-shadow: 0 0 7px var(--ac);
+      display: inline-block;
+    }
+
+    .layout-btns {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .btn-layout {
+      font-family: var(--mo);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--bd);
+      background: var(--bg-surface-elevated);
+      color: var(--tx);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .btn-layout.active, .btn-layout:hover {
+      background: var(--ac-lo);
+      border-color: var(--ac);
+      color: var(--ac);
+      box-shadow: 0 0 10px var(--ac-gl);
+    }
+
+    /* 3-Camera Feeds Container */
+    .camera-grid {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Layout Mode 1: 3 Equal Columns (Streamlit Prototype standard) */
+    .layout-3col {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Layout Mode 2: 1 Main Focus + 2 Side Auxiliary */
+    .layout-focus {
+      grid-template-columns: 2fr 1fr;
+      grid-template-rows: auto auto;
+    }
+
+    .layout-focus .cam-card:first-child {
+      grid-row: span 2;
+    }
+
+    @media (max-width: 1100px) {
+      .layout-3col, .layout-focus {
+        grid-template-columns: 1fr;
+      }
+      .layout-focus .cam-card:first-child {
+        grid-row: auto;
+      }
+    }
+
+    /* Cam Card */
+    .cam-card {
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: var(--card);
+      box-shadow: 0 6px 28px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      transition: var(--transition);
+    }
+
+    .cam-card:hover {
+      border-color: var(--bd-hi);
+      box-shadow: 0 10px 35px rgba(0, 212, 255, 0.08);
+    }
+
+    .cam-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.9rem;
+      background: rgba(0, 0, 0, 0.55);
+      border-bottom: 1px solid var(--bd);
+      font-family: var(--mo);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--ac);
+    }
+
+    .cam-name {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bdg {
+      font-size: 0.55rem;
+      padding: 2px 7px;
+      border-radius: var(--radius-full);
+      font-weight: 700;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+
+    .bdg-live {
+      background: var(--gn-lo);
+      color: var(--gn);
+      border: 1px solid rgba(0, 232, 135, 0.35);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .bdg-live::before {
+      content: '';
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--gn);
+      box-shadow: 0 0 5px var(--gn);
+      animation: pulseLive 1.4s infinite;
+    }
+
+    .bdg-anpr {
+      background: var(--pu-lo);
+      color: var(--pu);
+      border: 1px solid rgba(192, 132, 252, 0.35);
+    }
+
+    /* Video Frame Viewport */
+    .cam-viewport {
+      position: relative;
+      background: #000;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .cam-viewport img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .cam-viewport::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 212, 255, 0.03) 0px,
+        rgba(0, 212, 255, 0.03) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+    }
+
+    .corner-brackets {
+      position: absolute;
+      inset: 6px;
+      pointer-events: none;
+      z-index: 3;
+      background-image:
+        linear-gradient(to right, var(--ac) 2px, transparent 2px),
+        linear-gradient(to bottom, var(--ac) 2px, transparent 2px),
+        linear-gradient(to left, var(--ac) 2px, transparent 2px),
+        linear-gradient(to bottom, var(--ac) 2px, transparent 2px),
+        linear-gradient(to right, var(--ac) 2px, transparent 2px),
+        linear-gradient(to top, var(--ac) 2px, transparent 2px),
+        linear-gradient(to left, var(--ac) 2px, transparent 2px),
+        linear-gradient(to top, var(--ac) 2px, transparent 2px);
+      background-repeat: no-repeat;
+      background-size: 14px 14px;
+      background-position: top left, top left, top right, top right, bottom left, bottom left, bottom right, bottom right;
+      opacity: 0.65;
+    }
+
+    /* Cam Footer Controls */
+    .cam-foot {
+      padding: 0.6rem 0.85rem;
+      background: rgba(8, 14, 24, 0.95);
+      border-top: 1px solid var(--bd);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    select.cam-src-select {
+      background: var(--bg-surface-elevated);
+      color: var(--tx-bright);
+      font-family: var(--mo);
+      font-size: 0.70rem;
+      padding: 0.35rem 1.6rem 0.35rem 0.65rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--bd);
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300d4ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.5rem center;
+      transition: var(--transition);
+      flex: 1;
+      min-width: 0;
+    }
+
+    select.cam-src-select:hover, select.cam-src-select:focus {
+      border-color: var(--ac);
+    }
+
+    .cam-actions {
+      display: flex;
+      gap: 0.35rem;
+    }
+
+    .btn-icon {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-sm);
+      color: var(--tx);
+      cursor: pointer;
+      padding: 0.35rem 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+
+    .btn-icon:hover {
+      background: var(--ac-lo);
+      border-color: var(--ac);
+      color: var(--ac);
+    }
+
+    /* Bottom Intelligence Section (3 Columns) */
+    .intel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 1100px) {
+      .intel-grid { grid-template-columns: 1fr; }
+    }
+
+    .panel-box {
+      background: var(--card);
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-md);
+      padding: 0.9rem 1.1rem;
+      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.45);
+    }
+
+    .panel-hdr {
+      font-family: var(--mo);
+      font-size: 0.70rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #7abdd6;
+      border-bottom: 1px solid var(--bd);
+      padding-bottom: 0.45rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-hdr::before {
+      content: '';
+      width: 3px;
+      height: 12px;
+      background: var(--ac);
+      box-shadow: 0 0 8px var(--ac);
+      margin-right: 6px;
+      display: inline-block;
+    }
+
+    /* Gauge */
+    .gauge-track {
+      width: 100%;
+      height: 7px;
+      background: #08101a;
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      border: 1px solid var(--bd);
+      margin: 4px 0 8px;
+    }
+
+    .gauge-fill {
+      height: 100%;
+      width: 25%;
+      background: linear-gradient(90deg, var(--ac), var(--gn));
+      box-shadow: 0 0 10px var(--ac-gl);
+      transition: width 0.4s ease;
+    }
+
+    .hw-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .hw-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-sm);
+      padding: 0.45rem 0.6rem;
+      font-family: var(--mo);
+    }
+
+    .hw-k {
+      font-size: 0.52rem;
+      color: var(--dm);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .hw-v {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--ac);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Pipeline Rows */
+    .pipe-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.65rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-sm);
+      margin-bottom: 0.45rem;
+      font-family: var(--mo);
+    }
+
+    .pipe-name {
+      font-size: 0.70rem;
+      font-weight: 700;
+      color: var(--tx-bright);
+    }
+
+    .pipe-desc {
+      font-size: 0.55rem;
+      color: var(--dm);
+    }
+
+    .pipe-badge {
+      font-size: 0.58rem;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: var(--radius-full);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .pipe-active {
+      background: var(--gn-lo);
+      color: var(--gn);
+      border: 1px solid rgba(0, 232, 135, 0.4);
+    }
+
+    /* Terminal */
+    .audit-terminal {
+      background: #03060a;
+      border: 1px solid var(--bd);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.7rem;
+      font-family: var(--mo);
+      font-size: 0.66rem;
+      height: 185px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 0.35rem;
+    }
+
+    .log-line {
+      line-height: 1.35;
+      word-break: break-all;
+    }
+
+    .log-ts { color: var(--dm); margin-right: 5px; }
+    .log-tag { font-weight: 800; padding: 1px 4px; border-radius: 2px; margin-right: 4px; }
+    .log-tag.breach { background: var(--rd-lo); color: var(--rd); }
+    .log-tag.anpr { background: var(--pu-lo); color: var(--pu); }
+    .log-tag.face { background: var(--gn-lo); color: var(--gn); }
+    .log-tag.sys { background: var(--ac-lo); color: var(--ac); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand-section">
+      <div class="brand-shield">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+      </div>
+      <div>
+        <div class="brand-title">IBVAP // MULTI-CHECKPOINT SURVEILLANCE</div>
+        <div class="brand-sub">EDGE AI POSE ESTIMATION • ANPR • BLA TRIPWIRE • 3-CAMERA GRID</div>
+      </div>
+    </div>
+
+    <div class="header-chips">
+      <div class="t-chip">
+        <div class="dot-live"></div>
+        <span id="defenseStatusHeader">SYSTEM ARMED</span>
+      </div>
+
+      <div class="t-chip">
+        <span style="color: var(--ac);" id="gpuBadgeHeader">RTX 4050 ACCELERATED</span>
+      </div>
+
+      <div class="t-chip" id="clockDisplay">
+        --:--:-- UTC
+      </div>
+
+      <a href="/docs" target="_blank" class="btn-hdr">API Docs</a>
+      <a href="/api/telemetry" target="_blank" class="btn-hdr">Telemetry</a>
+    </div>
+  </header>
+
+  <!-- Container -->
+  <div class="container">
+
+    <!-- Tactical Command Bar -->
+    <div class="cmd-bar">
+      <div class="cmd-item">
+        <span class="cmd-lbl">DEFENSE STATUS</span>
+        <span class="cmd-val armed" id="cmdDefenseStatus">
+          <span class="dot-live"></span> ARMED // ACTIVE WATCH
+        </span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-lbl">THREAT LEVEL</span>
+        <span class="cmd-val" id="cmdThreatLevel">DEFCON 4 // GUARDED</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-lbl">AI PIPELINES ONLINE</span>
+        <span class="cmd-val">POSE + VEHICLES + ANPR + FACES</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-lbl">ACTIVE POSTS</span>
+        <span class="cmd-val">HAWKINS • OUT POST • ALPHA</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-lbl">HARDWARE ENGINE</span>
+        <span class="cmd-val" id="cmdGpuName">RTX 4050 (CUDA:0)</span>
+      </div>
+    </div>
+
+    <!-- 6-Item Tactical Stats Grid -->
+    <div class="stats-grid">
+      <div class="scard">
+        <div class="scard-lbl">SYSTEM FPS / LATENCY</div>
+        <div class="scard-num" id="statFps">0.0</div>
+        <div class="scard-sub" id="statLatency">LATENCY: 0.0ms</div>
+      </div>
+      <div class="scard g">
+        <div class="scard-lbl">TRACKED TARGETS</div>
+        <div class="scard-num" id="statTargets">0</div>
+        <div class="scard-sub">CENTROID TRACKING</div>
+      </div>
+      <div class="scard">
+        <div class="scard-lbl">HUMAN TARGETS</div>
+        <div class="scard-num" id="statPersons">0</div>
+        <div class="scard-sub">17-PT POSE ESTIMATION</div>
+      </div>
+      <div class="scard p">
+        <div class="scard-lbl">VEHICLES & ANPR</div>
+        <div class="scard-num" id="statVehicles">0</div>
+        <div class="scard-sub" id="statPlates">PLATES: 0 SCANNED</div>
+      </div>
+      <div class="scard g">
+        <div class="scard-lbl">FACIAL DETECTIONS</div>
+        <div class="scard-num" id="statFaces">0</div>
+        <div class="scard-sub">YUNET DNN SCANNER</div>
+      </div>
+      <div class="scard r">
+        <div class="scard-lbl">PERIMETER BREACHES</div>
+        <div class="scard-num" id="statBreaches">0</div>
+        <div class="scard-sub" id="statBreachSub">VIRTUAL TRIPWIRE & CLIMB</div>
+      </div>
+    </div>
+
+    <!-- Camera Layout Bar -->
+    <div class="layout-bar">
+      <div class="sec-hd">Live Checkpoint Surveillance Feeds</div>
+      <div class="layout-btns">
+        <button class="btn-layout active" id="btnLayout3Col">3 Equal Columns</button>
+        <button class="btn-layout" id="btnLayoutFocus">1 Focus + 2 Aux</button>
+      </div>
+    </div>
+
+    <!-- 3-Camera Surveillance Grid -->
+    <div class="camera-grid layout-3col" id="cameraContainer">
+
+      <!-- CAMERA 1: HAWKINS POST -->
+      <div class="cam-card" id="cardCam1">
+        <div class="cam-head">
+          <div class="cam-name">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            <span>CAM 1 // HAWKINS POST</span>
+          </div>
+          <span class="bdg bdg-live">LIVE</span>
+        </div>
+
+        <div class="cam-viewport" id="viewportCam1">
+          <img id="streamCam1" src="/api/stream/video/1?source=fence.mp4" alt="CAM 1 Feed" />
+          <div class="corner-brackets"></div>
+        </div>
+
+        <div class="cam-foot">
+          <select class="cam-src-select" id="selectCam1">
+            <option value="fence.mp4" selected>fence.mp4 (Fence Perimeter)</option>
+            <option value="fence1.mp4">fence1.mp4 (Perimeter Alt)</option>
+            <option value="vehicle.mp4">vehicle.mp4 (Checkpoint)</option>
+            <option value="sample.mp4">sample.mp4 (Aerial)</option>
+            <option value="animal.mp4">animal.mp4 (Wildlife Sector)</option>
+            <option value="0">Live Webcam (Device 0)</option>
+          </select>
+          <div class="cam-actions">
+            <button class="btn-icon" onclick="snapshotCam('streamCam1', 'CAM1')" title="Snapshot">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </button>
+            <button class="btn-icon" onclick="fullscreenCam('viewportCam1')" title="Fullscreen">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+            </button>
+            <button class="btn-icon" onclick="reloadCam('1', 'streamCam1', 'selectCam1')" title="Reload">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAMERA 2: OUT POST (ANPR & VEHICLES) -->
+      <div class="cam-card" id="cardCam2">
+        <div class="cam-head">
+          <div class="cam-name">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            <span>CAM 2 // OUT POST (ANPR)</span>
+          </div>
+          <span class="bdg bdg-anpr">ANPR ACTIVE</span>
+        </div>
+
+        <div class="cam-viewport" id="viewportCam2">
+          <img id="streamCam2" src="/api/stream/video/2?source=vehicle.mp4" alt="CAM 2 Feed" />
+          <div class="corner-brackets"></div>
+        </div>
+
+        <div class="cam-foot">
+          <select class="cam-src-select" id="selectCam2">
+            <option value="vehicle.mp4" selected>vehicle.mp4 (Vehicle Checkpoint)</option>
+            <option value="fence.mp4">fence.mp4 (Fence Perimeter)</option>
+            <option value="sample.mp4">sample.mp4 (Aerial Patrol)</option>
+            <option value="animal.mp4">animal.mp4 (Wildlife Sector)</option>
+            <option value="0">Live Webcam (Device 0)</option>
+          </select>
+          <div class="cam-actions">
+            <button class="btn-icon" onclick="snapshotCam('streamCam2', 'CAM2')" title="Snapshot">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </button>
+            <button class="btn-icon" onclick="fullscreenCam('viewportCam2')" title="Fullscreen">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+            </button>
+            <button class="btn-icon" onclick="reloadCam('2', 'streamCam2', 'selectCam2')" title="Reload">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAMERA 3: ALPHA POST -->
+      <div class="cam-card" id="cardCam3">
+        <div class="cam-head">
+          <div class="cam-name">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            <span>CAM 3 // ALPHA POST</span>
+          </div>
+          <span class="bdg bdg-live">LIVE</span>
+        </div>
+
+        <div class="cam-viewport" id="viewportCam3">
+          <img id="streamCam3" src="/api/stream/video/3?source=sample.mp4" alt="CAM 3 Feed" />
+          <div class="corner-brackets"></div>
+        </div>
+
+        <div class="cam-foot">
+          <select class="cam-src-select" id="selectCam3">
+            <option value="sample.mp4" selected>sample.mp4 (Aerial Patrol)</option>
+            <option value="animal.mp4">animal.mp4 (Wildlife Sector)</option>
+            <option value="animal1.mp4">animal1.mp4 (Border Zone B)</option>
+            <option value="fence.mp4">fence.mp4 (Fence Perimeter)</option>
+            <option value="vehicle.mp4">vehicle.mp4 (Checkpoint)</option>
+            <option value="0">Live Webcam (Device 0)</option>
+          </select>
+          <div class="cam-actions">
+            <button class="btn-icon" onclick="snapshotCam('streamCam3', 'CAM3')" title="Snapshot">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </button>
+            <button class="btn-icon" onclick="fullscreenCam('viewportCam3')" title="Fullscreen">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+            </button>
+            <button class="btn-icon" onclick="reloadCam('3', 'streamCam3', 'selectCam3')" title="Reload">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Intelligence & Telemetry Panels (3 Columns) -->
+    <div class="intel-grid">
+
+      <!-- 1. Hardware Telemetry Panel -->
+      <div class="panel-box">
+        <div class="panel-hdr">
+          <span>HARDWARE TELEMETRY</span>
+          <span style="color: var(--gn); font-size: 0.62rem;">CUDA:0 ACCELERATED</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; font-family: var(--mo); font-size: 0.64rem;">
+          <span style="color: var(--dm);">VRAM UTILIZATION</span>
+          <span id="vramText" style="color: var(--ac);">-- MB</span>
+        </div>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="vramBar"></div>
+        </div>
+
+        <div class="hw-grid">
+          <div class="hw-item">
+            <div class="hw-k">ACCELERATOR</div>
+            <div class="hw-v" id="gpuModelText">RTX 4050</div>
+          </div>
+          <div class="hw-item">
+            <div class="hw-k">CUDA VERSION</div>
+            <div class="hw-v" id="cudaVerText">12.1 (cu121)</div>
+          </div>
+          <div class="hw-item">
+            <div class="hw-k">ENGINE UPTIME</div>
+            <div class="hw-v" id="uptimeText">0.0s</div>
+          </div>
+          <div class="hw-item">
+            <div class="hw-k">ACTIVE SESSIONS</div>
+            <div class="hw-v" style="color: var(--gn);">3 CAMERAS</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Modular Pipeline Status Panel -->
+      <div class="panel-box">
+        <div class="panel-hdr">
+          <span>MODULAR PIPELINE STATUS</span>
+          <span style="color: var(--ac); font-size: 0.62rem;">ALL ENGINES ONLINE</span>
+        </div>
+
+        <div class="pipe-row">
+          <div>
+            <div class="pipe-name">YOLOv8 Pose</div>
+            <div class="pipe-desc">17 Skeletal Keypoints (CUDA:0)</div>
+          </div>
+          <span class="pipe-badge pipe-active">ACTIVE</span>
+        </div>
+
+        <div class="pipe-row">
+          <div>
+            <div class="pipe-name">Plate YOLO & EasyOCR</div>
+            <div class="pipe-desc">Vehicle Detection & ANPR (CUDA:0)</div>
+          </div>
+          <span class="pipe-badge pipe-active">ACTIVE</span>
+        </div>
+
+        <div class="pipe-row">
+          <div>
+            <div class="pipe-name">YuNet Face Detector</div>
+            <div class="pipe-desc">OpenCV DNN Facial Recognition</div>
+          </div>
+          <span class="pipe-badge pipe-active">ACTIVE</span>
+        </div>
+
+        <div class="pipe-row">
+          <div>
+            <div class="pipe-name">BLA Breach Analytics</div>
+            <div class="pipe-desc">Virtual Fence & Climbing Kinematics</div>
+          </div>
+          <span class="pipe-badge pipe-active">ACTIVE</span>
+        </div>
+      </div>
+
+      <!-- 3. Surveillance Event Audit Panel -->
+      <div class="panel-box">
+        <div class="panel-hdr">
+          <span>SURVEILLANCE EVENT AUDIT</span>
+          <span style="color: var(--dm); font-size: 0.62rem;">LIVE TELEMETRY FEED</span>
+        </div>
+
+        <div class="audit-terminal" id="auditTerminal">
+          <!-- Dynamically populated via JS -->
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Telemetry Elements
+    const statFps = document.getElementById('statFps');
+    const statLatency = document.getElementById('statLatency');
+    const statTargets = document.getElementById('statTargets');
+    const statPersons = document.getElementById('statPersons');
+    const statVehicles = document.getElementById('statVehicles');
+    const statPlates = document.getElementById('statPlates');
+    const statFaces = document.getElementById('statFaces');
+    const statBreaches = document.getElementById('statBreaches');
+    const statBreachSub = document.getElementById('statBreachSub');
+
+    const cmdDefenseStatus = document.getElementById('cmdDefenseStatus');
+    const cmdThreatLevel = document.getElementById('cmdThreatLevel');
+    const cmdGpuName = document.getElementById('cmdGpuName');
+    const defenseStatusHeader = document.getElementById('defenseStatusHeader');
+    const gpuBadgeHeader = document.getElementById('gpuBadgeHeader');
+    const clockDisplay = document.getElementById('clockDisplay');
+
+    const vramText = document.getElementById('vramText');
+    const vramBar = document.getElementById('vramBar');
+    const gpuModelText = document.getElementById('gpuModelText');
+    const cudaVerText = document.getElementById('cudaVerText');
+    const uptimeText = document.getElementById('uptimeText');
+
+    const cameraContainer = document.getElementById('cameraContainer');
+    const btnLayout3Col = document.getElementById('btnLayout3Col');
+    const btnLayoutFocus = document.getElementById('btnLayoutFocus');
+    const auditTerminal = document.getElementById('auditTerminal');
+
+    const seenAlertKeys = new Set();
+
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      clockDisplay.textContent = now.toTimeString().split(' ')[0] + ' UTC';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Audit Logger
+    function logEvent(tag, msg, level = 'sys') {
+      const ts = new Date().toTimeString().split(' ')[0];
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.innerHTML = `<span class="log-ts">[${ts}]</span><span class="log-tag ${level}">[${tag}]</span> ${msg}`;
+      auditTerminal.prepend(div);
+      if (auditTerminal.children.length > 50) {
+        auditTerminal.removeChild(auditTerminal.lastChild);
+      }
+    }
+
+    // Layout Toggle
+    btnLayout3Col.addEventListener('click', () => {
+      cameraContainer.className = 'camera-grid layout-3col';
+      btnLayout3Col.classList.add('active');
+      btnLayoutFocus.classList.remove('active');
+      logEvent('UI', 'Switched to 3 Equal Columns Layout', 'sys');
+    });
+
+    btnLayoutFocus.addEventListener('click', () => {
+      cameraContainer.className = 'camera-grid layout-focus';
+      btnLayoutFocus.classList.add('active');
+      btnLayout3Col.classList.remove('active');
+      logEvent('UI', 'Switched to Tactical Focus Layout (1 Main + 2 Aux)', 'sys');
+    });
+
+    // Camera Stream Controls
+    function reloadCam(camNum, imgId, selectId) {
+      const select = document.getElementById(selectId);
+      const img = document.getElementById(imgId);
+      const src = select.value;
+      img.src = `/api/stream/video/${camNum}?source=${encodeURIComponent(src)}&_t=${Date.now()}`;
+      logEvent('STREAM', `CAM ${camNum} re-routed to: ${src}`, 'sys');
+    }
+
+    // Bind source select changes
+    ['1', '2', '3'].forEach(num => {
+      const select = document.getElementById(`selectCam${num}`);
+      select.addEventListener('change', () => {
+        reloadCam(num, `streamCam${num}`, `selectCam${num}`);
+      });
+    });
+
+    // Snapshot
+    function snapshotCam(imgId, camTag) {
+      const img = document.getElementById(imgId);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 848;
+        canvas.height = img.naturalHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const a = document.createElement('a');
+        a.download = `IBVAP_${camTag}_${Date.now()}.png`;
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+        logEvent('SNAPSHOT', `Captured snapshot from ${camTag}`, 'face');
+      } catch (err) {
+        logEvent('SNAPSHOT', `Snapshot notice: ${err.message}`, 'sys');
+      }
+    }
+
+    // Fullscreen
+    function fullscreenCam(viewportId) {
+      const elem = document.getElementById(viewportId);
+      if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    // Dynamic Video Sources Population
+    async function populateVideoSources() {
+      try {
+        const res = await fetch('/api/video-sources');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.files && data.files.length > 0) {
+          ['selectCam1', 'selectCam2', 'selectCam3'].forEach(selId => {
+            const sel = document.getElementById(selId);
+            const curVal = sel.value;
+            sel.innerHTML = '';
+
+            data.files.forEach(f => {
+              const opt = document.createElement('option');
+              opt.value = f.id;
+              opt.textContent = `${f.label}`;
+              sel.appendChild(opt);
+            });
+
+            if (data.cameras) {
+              data.cameras.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.label;
+                sel.appendChild(opt);
+              });
+            }
+
+            if ([...sel.options].some(o => o.value === curVal)) {
+              sel.value = curVal;
+            }
+          });
+        }
+      } catch (e) {}
+    }
+
+    // Telemetry Polling
+    async function pollTelemetry() {
+      try {
+        const res = await fetch('/api/telemetry');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        statFps.textContent = Number(data.fps || 0).toFixed(1);
+        statLatency.textContent = `LATENCY: ${Number(data.latency_ms || 0).toFixed(1)}ms`;
+
+        if (data.counts) {
+          statTargets.textContent = data.counts.total_targets || 0;
+          statPersons.textContent = data.counts.persons || 0;
+          statVehicles.textContent = data.counts.vehicles || 0;
+          statPlates.textContent = `PLATES: ${data.counts.plates || 0} SCANNED`;
+          statFaces.textContent = data.counts.faces || 0;
+          statBreaches.textContent = data.counts.breaches || 0;
+        }
+
+        if (data.gpu) {
+          const alloc = data.gpu.memory_allocated_mb || 0;
+          const resv = data.gpu.memory_reserved_mb || 1;
+          vramText.textContent = `${alloc} MB / ${resv} MB`;
+          const pct = Math.min(100, Math.max(8, (alloc / Math.max(resv, 1024)) * 100));
+          vramBar.style.width = `${pct}%`;
+
+          const gName = (data.gpu.device_name || 'RTX 4050').replace('NVIDIA ', '');
+          gpuModelText.textContent = gName;
+          cmdGpuName.textContent = `${gName} (CUDA:0)`;
+          gpuBadgeHeader.textContent = `${gName} ACTIVE`;
+          cudaVerText.textContent = data.gpu.cuda_version ? `CUDA ${data.gpu.cuda_version}` : 'CPU Mode';
+        }
+
+        if (data.uptime_seconds) {
+          uptimeText.textContent = `${data.uptime_seconds}s`;
+        }
+
+        // Threat level updates
+        if (data.has_breach || (data.counts && data.counts.breaches > 0)) {
+          cmdThreatLevel.innerHTML = '<span style="color: var(--rd);">DEFCON 2 // PERIMETER BREACH</span>';
+          cmdDefenseStatus.className = 'cmd-val breach';
+          statBreachSub.textContent = 'BREACH TRIGGERED (ALERT)';
+        } else {
+          cmdThreatLevel.innerHTML = '<span style="color: var(--ac);">DEFCON 4 // GUARDED</span>';
+          cmdDefenseStatus.className = 'cmd-val armed';
+          statBreachSub.textContent = 'VIRTUAL TRIPWIRE & CLIMB';
+        }
+
+        // Audit log alerts
+        if (data.active_alerts && data.active_alerts.length > 0) {
+          data.active_alerts.forEach(al => {
+            const key = `${al.timestamp}_${al.track_id}_${al.kind}`;
+            if (!seenAlertKeys.has(key)) {
+              seenAlertKeys.add(key);
+              logEvent(al.kind || 'BREACH', `ID ${al.track_id} ${al.label} @ ${al.camera_id}: ${al.reason}`, 'breach');
+            }
+          });
+        }
+      } catch (err) {}
+    }
+
+    // Boot Sequence
+    window.addEventListener('DOMContentLoaded', () => {
+      logEvent('SYSTEM', 'IBVAP 3-Camera Surveillance Architecture Online', 'sys');
+      logEvent('ANPR', 'Plate YOLO & EasyOCR Active on Video Checkpoints', 'anpr');
+      logEvent('AI-CORE', 'YOLOv8 Pose + 17 Joints Running on CUDA (RTX 4050)', 'face');
+      populateVideoSources();
+      pollTelemetry();
+      setInterval(pollTelemetry, 750);
+    });
+  </script>
+</body>
+</html>
