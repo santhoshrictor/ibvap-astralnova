@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IBVAP - Intelligent Border Video Analytics Platform</title>
+
+  <!-- Typography: Google Fonts (Inter, JetBrains Mono, Outfit) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tactical Cyber CSS Stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Top Tactical Navigation Header -->
+  <header>
+    <div class="brand-section">
+      <div class="brand-shield">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+      </div>
+      <div>
+        <div class="brand-title">IBVAP // MULTI-CHECKPOINT SURVEILLANCE</div>
+        <div class="brand-sub">EDGE AI POSE ESTIMATION • ANPR • BLA TRIPWIRE • 3-CAMERA MOSAIC</div>
+      </div>
+    </div>
+
+    <div class="header-chips">
+      <div class="t-chip">
+        <div class="dot-live"></div>
+        <span id="defenseStatusHeader">SYSTEM ARMED</span>
+      </div>
+
+      <div class="t-chip">
+        <span style="color: var(--ac);" id="gpuBadgeHeader">SIMULATED EDGE ACCELERATOR</span>
+      </div>
+
+      <div class="t-chip" id="clockDisplay">
+        --:--:-- UTC
+      </div>
+
+      <button class="btn-hdr" onclick="window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+        Telemetry
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="container">
+
+    <!-- Tactical Command Bar -->
+    <div class="cmd-bar">
+      <div class="cmd-item">
+        <span class="cmd-lbl">DEFENSE STATUS</span>
+        <span class="cmd-val armed" id="cmdDefenseStatus">
+          <span class="dot-live"></span> ARMED // ACTIVE WATCH
+        </span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-lbl">THREAT LEVEL</span>
+        <span class="cmd-val" id="cmdThreatLevel">DEFCON 4 // GUARDED</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-lbl">AI PIPELINES ONLINE</span>
+        <span class="cmd-val">POSE + VEHICLES + ANPR + FACES</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-lbl">ACTIVE CHECKPOINTS</span>
+        <span class="cmd-val">HAWKINS • OUT POST • ALPHA</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-lbl">PROCESSING ENGINE</span>
+        <span class="cmd-val" id="cmdGpuName">STANDALONE WEB EDGE</span>
+      </div>
+    </div>
+
+    <!-- 6-Item Tactical Stats Grid -->
+    <div class="stats-grid">
+      <div class="scard">
+        <div class="scard-lbl">SYSTEM FPS / LATENCY</div>
+        <div class="scard-num" id="statFps">30.2</div>
+        <div class="scard-sub" id="statLatency">LATENCY: 16.4ms</div>
+      </div>
+      <div class="scard g">
+        <div class="scard-lbl">TRACKED TARGETS</div>
+        <div class="scard-num" id="statTargets">14</div>
+        <div class="scard-sub">CENTROID TRACKING</div>
+      </div>
+      <div class="scard">
+        <div class="scard-lbl">HUMAN TARGETS</div>
+        <div class="scard-num" id="statPersons">5</div>
+        <div class="scard-sub">17-PT POSE ESTIMATION</div>
+      </div>
+      <div class="scard p">
+        <div class="scard-lbl">VEHICLES & ANPR</div>
+        <div class="scard-num" id="statVehicles">3</div>
+        <div class="scard-sub" id="statPlates">PLATES: 16 SCANNED</div>
+      </div>
+      <div class="scard g">
+        <div class="scard-lbl">FACIAL DETECTIONS</div>
+        <div class="scard-num" id="statFaces">2</div>
+        <div class="scard-sub">YUNET DNN SCANNER</div>
+      </div>
+      <div class="scard r">
+        <div class="scard-lbl">PERIMETER BREACHES</div>
+        <div class="scard-num" id="statBreaches">0</div>
+        <div class="scard-sub" id="statBreachSub">VIRTUAL TRIPWIRE & CLIMB</div>
+      </div>
+    </div>
+
+    <!-- Camera Layout Bar -->
+    <div class="layout-bar">
+      <div class="sec-hd">Live Checkpoint Surveillance Feeds</div>
+      <div class="layout-btns">
+        <button class="btn-layout active" id="btnLayout3Col">3 Equal Columns</button>
+        <button class="btn-layout" id="btnLayoutFocus">1 Focus + 2 Aux</button>
+      </div>
+    </div>
+
+    <!-- 3-Camera Mosaic Grid with HTML5 <video> Feeds -->
+    <div class="camera-grid layout-3col" id="cameraContainer">
+
+      <!-- CAMERA 1: HAWKINS POST (Perimeter Fence & Virtual Tripwire) -->
+      <div class="cam-card" id="cardCam1">
+        <div class="cam-head">
+          <div class="cam-name">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            <span>CAM 1 // HAWKINS POST</span>
+          </div>
+          <span class="bdg bdg-live">LIVE</span>
+        </div>
+
+        <div class="cam-viewport" id="viewportCam1">
+          <video id="videoCam1" autoplay muted loop playsinline src="fence.mp4"></video>
+          <canvas class="ai-overlay" id="overlayCam1"></canvas>
+          <div class="corner-brackets"></div>
+        </div>
+
+        <div class="cam-foot">
+          <select class="cam-src-select" id="selectCam1" onchange="changeVideoSource('videoCam1', 'selectCam1', 'CAM 1')">
+            <option value="fence.mp4" selected>fence.mp4 (Fence Perimeter)</option>
+            <option value="fence1.mp4">fence1.mp4 (Perimeter Alt)</option>
+            <option value="vehicle.mp4">vehicle.mp4 (Checkpoint Lane)</option>
+            <option value="sample.mp4">sample.mp4 (Aerial Patrol)</option>
+          </select>
+          <div class="cam-actions">
+            <button class="btn-icon" onclick="snapshotVideo('videoCam1', 'CAM1_HAWKINS')" title="Capture Snapshot">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </button>
+            <button class="btn-icon" onclick="toggleFullscreen('viewportCam1')" title="Toggle Fullscreen">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+            </button>
+            <button class="btn-icon" onclick="reloadVideo('videoCam1', 'CAM 1')" title="Restart Feed">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAMERA 2: OUT POST (ANPR & Vehicle Checkpoint) -->
+      <div class="cam-card" id="cardCam2">
+        <div class="cam-head">
+          <div class="cam-name">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            <span>CAM 2 // OUT POST (ANPR)</span>
+          </div>
+          <span class="bdg bdg-anpr">ANPR ACTIVE</span>
+        </div>
+
+        <div class="cam-viewport" id="viewportCam2">
+          <video id="videoCam2" autoplay muted loop playsinline src="vehicle.mp4"></video>
+          <canvas class="ai-overlay" id="overlayCam2"></canvas>
+          <div class="corner-brackets"></div>
+        </div>
+
+        <div class="cam-foot">
+          <select class="cam-src-select" id="selectCam2" onchange="changeVideoSource('videoCam2', 'selectCam2', 'CAM 2')">
+            <option value="vehicle.mp4" selected>vehicle.mp4 (Vehicle Checkpoint)</option>
+            <option value="fence.mp4">fence.mp4 (Fence Perimeter)</option>
+            <option value="sample.mp4">sample.mp4 (Aerial Patrol)</option>
+            <option value="fence1.mp4">fence1.mp4 (Perimeter Alt)</option>
+          </select>
+          <div class="cam-actions">
+            <button class="btn-icon" onclick="snapshotVideo('videoCam2', 'CAM2_OUTPOST')" title="Capture Snapshot">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </button>
+            <button class="btn-icon" onclick="toggleFullscreen('viewportCam2')" title="Toggle Fullscreen">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+            </button>
+            <button class="btn-icon" onclick="reloadVideo('videoCam2', 'CAM 2')" title="Restart Feed">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAMERA 3: ALPHA POST (Aerial Patrol & Sector Sweeper) -->
+      <div class="cam-card" id="cardCam3">
+        <div class="cam-head">
+          <div class="cam-name">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            <span>CAM 3 // ALPHA POST</span>
+          </div>
+          <span class="bdg bdg-live">LIVE</span>
+        </div>
+
+        <div class="cam-viewport" id="viewportCam3">
+          <video id="videoCam3" autoplay muted loop playsinline src="sample.mp4"></video>
+          <canvas class="ai-overlay" id="overlayCam3"></canvas>
+          <div class="corner-brackets"></div>
+        </div>
+
+        <div class="cam-foot">
+          <select class="cam-src-select" id="selectCam3" onchange="changeVideoSource('videoCam3', 'selectCam3', 'CAM 3')">
+            <option value="sample.mp4" selected>sample.mp4 (Aerial Patrol)</option>
+            <option value="sample2.mp4">sample2.mp4 (Sector Sweep Alt)</option>
+            <option value="fence.mp4">fence.mp4 (Fence Perimeter)</option>
+            <option value="vehicle.mp4">vehicle.mp4 (Checkpoint Lane)</option>
+          </select>
+          <div class="cam-actions">
+            <button class="btn-icon" onclick="snapshotVideo('videoCam3', 'CAM3_ALPHA')" title="Capture Snapshot">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </button>
+            <button class="btn-icon" onclick="toggleFullscreen('viewportCam3')" title="Toggle Fullscreen">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+            </button>
+            <button class="btn-icon" onclick="reloadVideo('videoCam3', 'CAM 3')" title="Restart Feed">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Intelligence & Telemetry Panels (3-Column Tactical Section) -->
+    <div class="intel-grid">
+
+      <!-- 1. ANPR Vehicle Registry Panel -->
+      <div class="panel-box">
+        <div class="panel-hdr">
+          <span>ANPR VEHICLE REGISTRY</span>
+          <span id="anprCounterBadge" style="color: var(--gn); font-size: 0.62rem;">16 DETECTIONS</span>
+        </div>
+
+        <div class="anpr-registry-container">
+          <table class="anpr-table">
+            <thead>
+              <tr>
+                <th style="width: 28%;">TIMESTAMP</th>
+                <th style="width: 44%;">PLATE NUMBER</th>
+                <th style="width: 28%; text-align: right;">STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="anprRegistryBody">
+              <tr class="anpr-empty-row">
+                <td colspan="3">INITIALIZING ANPR ENGINE...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. Modular Pipeline Status Panel -->
+      <div class="panel-box">
+        <div class="panel-hdr">
+          <span>MODULAR PIPELINE STATUS</span>
+          <span style="color: var(--ac); font-size: 0.62rem;">4 ENGINES ONLINE</span>
+        </div>
+
+        <div class="pipe-row">
+          <div>
+            <div class="pipe-name">YOLOv8 Pose</div>
+            <div class="pipe-desc">17 Skeletal Keypoints & Pose Analytics</div>
+          </div>
+          <span class="pipe-badge pipe-active">ACTIVE</span>
+        </div>
+
+        <div class="pipe-row">
+          <div>
+            <div class="pipe-name">Plate YOLO & EasyOCR</div>
+            <div class="pipe-desc">Vehicle Detection & Neural ANPR</div>
+          </div>
+          <span class="pipe-badge pipe-active">ACTIVE</span>
+        </div>
+
+        <div class="pipe-row">
+          <div>
+            <div class="pipe-name">YuNet Face Detector</div>
+            <div class="pipe-desc">DNN Facial Recognition & Biometric Vector</div>
+          </div>
+          <span class="pipe-badge pipe-active">ACTIVE</span>
+        </div>
+
+        <div class="pipe-row">
+          <div>
+            <div class="pipe-name">BLA Breach Analytics</div>
+            <div class="pipe-desc">Virtual Fence & Climbing Kinematics</div>
+          </div>
+          <span class="pipe-badge pipe-active">ACTIVE</span>
+        </div>
+      </div>
+
+      <!-- 3. Surveillance Event Audit Panel -->
+      <div class="panel-box">
+        <div class="panel-hdr">
+          <span>SURVEILLANCE EVENT AUDIT</span>
+          <span style="color: var(--dm); font-size: 0.62rem;">LIVE TELEMETRY STREAM</span>
+        </div>
+
+        <div class="audit-terminal" id="auditTerminal">
+          <!-- Dynamically populated via app.js -->
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Client-Side Telemetry & AI Simulation Engine -->
+  <script src="app.js"></script>
+</body>
+</html>
