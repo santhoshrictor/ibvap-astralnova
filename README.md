@@ -1,3 +1,13 @@
+---
+title: IBVAP - Border Video Analytics Platform
+emoji: 🛡️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # IBVAP - Intelligent Boundary & Video Analytics Platform
 
 An AI-powered video surveillance and activity analysis application built with **Streamlit**, **YOLOv8**, **OpenCV**, and **EasyOCR**.
