@@ -1380,6 +1380,19 @@ async def get_system_status():
     return await get_realtime_telemetry()
 
 
+@app.get("/api/health", tags=["System"])
+async def health_check():
+    """Lightweight edge health check endpoint for Vercel standby frontend polling."""
+    engine = getattr(app.state, "engine", None)
+    return {
+        "status": "online",
+        "healthy": True,
+        "node": "EDGE_AI_NODE_01",
+        "device": getattr(engine, "device_name", "NVIDIA GeForce RTX 4050 (CUDA)"),
+        "timestamp": time.time()
+    }
+
+
 # ---------------------------------------------------------------------------
 # Individual Camera Streaming Endpoints
 # ---------------------------------------------------------------------------

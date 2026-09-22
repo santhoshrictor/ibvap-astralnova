@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IBVAP // Standby - Connecting to Edge AI Node (RTX 4050)</title>
+  <meta name="description" content="Intelligent Border Video Analytics Platform (IBVAP) Edge Node Standby Gateway. Automated GPU Node Awakening & Live Dashboard Handshake." />
+
+  <!-- Google Fonts: Orbitron, JetBrains Mono, Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-deep: #03070d;
+      --bg-surface: #070e18;
+      --bg-card: rgba(10, 20, 34, 0.78);
+      --bg-card-border: rgba(0, 212, 255, 0.22);
+      
+      --cyan-core: #00d4ff;
+      --cyan-glow: rgba(0, 212, 255, 0.45);
+      --cyan-dim: rgba(0, 212, 255, 0.12);
+
+      --emerald-core: #00e887;
+      --emerald-glow: rgba(0, 232, 135, 0.5);
+      --emerald-dim: rgba(0, 232, 135, 0.12);
+
+      --amber-core: #ffaa00;
+      --amber-glow: rgba(255, 170, 0, 0.4);
+      --amber-dim: rgba(255, 170, 0, 0.12);
+
+      --red-core: #ff334b;
+      --red-glow: rgba(255, 51, 75, 0.4);
+
+      --text-main: #d3e7f5;
+      --text-dim: #648299;
+      --text-highlight: #ffffff;
+
+      --font-display: 'Orbitron', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-body: 'Inter', -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    /* Tactical Background Matrix Grid & Radial Scan */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, rgba(0, 212, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 212, 255, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-vignette {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, transparent 20%, #03070d 85%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .scanline {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--cyan-core), transparent);
+      opacity: 0.6;
+      box-shadow: 0 0 16px var(--cyan-core);
+      animation: scanline 7s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    @keyframes scanline {
+      0% { top: -5%; opacity: 0; }
+      15% { opacity: 0.6; }
+      85% { opacity: 0.6; }
+      100% { top: 105%; opacity: 0; }
+    }
+
+    /* Top Military Header */
+    header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--bg-card-border);
+      background: rgba(4, 10, 18, 0.85);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .radar-icon {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--cyan-core);
+      border-radius: 50%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
+    .radar-icon::before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px dashed var(--cyan-core);
+      animation: spin 6s linear infinite;
+    }
+
+    .radar-icon::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--cyan-core);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--cyan-core);
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      letter-spacing: 2.5px;
+      font-weight: 800;
+      color: var(--text-highlight);
+      text-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    .brand-sub {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 1.5px;
+      color: var(--cyan-core);
+    }
+
+    .security-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 170, 0, 0.08);
+      border: 1px solid rgba(255, 170, 0, 0.28);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      color: var(--amber-core);
+    }
+
+    .pulsing-amber-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--amber-core);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--amber-core);
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.4; }
+    }
+
+    /* Main Center Container */
+    main {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 20px;
+    }
+
+    .standby-card {
+      width: 100%;
+      max-width: 880px;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 212, 255, 0.12);
+      padding: 44px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .standby-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--cyan-core), var(--emerald-core), transparent);
+    }
+
+    /* Corner Sci-Fi Bracket Accents */
+    .corner-accent {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-color: var(--cyan-core);
+      pointer-events: none;
+      opacity: 0.7;
+    }
+    .corner-tl { top: 8px; left: 8px; border-top: 2px solid; border-left: 2px solid; }
+    .corner-tr { top: 8px; right: 8px; border-top: 2px solid; border-right: 2px solid; }
+    .corner-bl { bottom: 8px; left: 8px; border-bottom: 2px solid; border-left: 2px solid; }
+    .corner-br { bottom: 8px; right: 8px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    /* Orbital GPU Scanner */
+    .scanner-hub {
+      width: 140px;
+      height: 140px;
+      position: relative;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      box-sizing: border-box;
+    }
+
+    .ring-outer {
+      inset: 0;
+      border-top-color: var(--cyan-core);
+      border-bottom-color: var(--cyan-core);
+      animation: spin 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+
+    .ring-mid {
+      inset: 16px;
+      border-left-color: rgba(0, 232, 135, 0.7);
+      border-right-color: rgba(0, 232, 135, 0.7);
+      border-style: dashed;
+      animation: spin-reverse 9s linear infinite;
+    }
+
+    .ring-inner {
+      inset: 32px;
+      border: 1px solid rgba(0, 212, 255, 0.35);
+      border-top-color: var(--amber-core);
+      animation: spin 4s linear infinite;
+    }
+
+    .gpu-core {
+      width: 52px;
+      height: 52px;
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.25) 0%, rgba(7, 14, 24, 0.9) 80%);
+      border: 1px solid var(--cyan-core);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--cyan-glow);
+      transition: all 0.4s ease;
+    }
+
+    .gpu-icon-svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--cyan-core);
+      filter: drop-shadow(0 0 6px var(--cyan-core));
+    }
+
+    .gpu-sub {
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      color: var(--emerald-core);
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    @keyframes spin-reverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+
+    /* Primary Headings Required by User */
+    .primary-title {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--text-highlight);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      text-shadow: 0 0 16px var(--cyan-glow);
+      line-height: 1.35;
+    }
+
+    .secondary-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.96rem;
+      color: var(--cyan-core);
+      letter-spacing: 0.8px;
+      margin-bottom: 26px;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    /* Spec & Telemetry Pills */
+    .specs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      width: 100%;
+      margin-bottom: 28px;
+    }
+
+    .spec-item {
+      background: rgba(5, 12, 22, 0.7);
+      border: 1px solid rgba(0, 212, 255, 0.16);
+      border-radius: 6px;
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .spec-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .spec-val {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .val-active {
+      color: var(--cyan-core);
+    }
+    
+    .val-wake {
+      color: var(--amber-core);
+    }
+
+    .val-online {
+      color: var(--emerald-core);
+    }
+
+    /* Live Progress Pipeline */
+    .progress-wrapper {
+      width: 100%;
+      margin-bottom: 24px;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(0, 212, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 35%;
+      background: linear-gradient(90deg, var(--cyan-core), var(--emerald-core));
+      box-shadow: 0 0 12px var(--cyan-glow);
+      border-radius: 3px;
+      animation: indeterminate-flow 2.2s infinite ease-in-out;
+      transition: width 0.3s ease;
+    }
+
+    @keyframes indeterminate-flow {
+      0% { left: 0%; width: 15%; }
+      50% { left: 40%; width: 50%; }
+      100% { left: 95%; width: 10%; }
+    }
+
+    /* Terminal Console Output */
+    .terminal-console {
+      width: 100%;
+      background: #02060b;
+      border: 1px solid rgba(0, 212, 255, 0.18);
+      border-radius: 8px;
+      padding: 16px 20px;
+      text-align: left;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      max-height: 180px;
+      overflow-y: auto;
+      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.9);
+      margin-bottom: 24px;
+    }
+
+    .terminal-line {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .timestamp {
+      color: var(--text-dim);
+      user-select: none;
+    }
+
+    .tag-sys { color: var(--cyan-core); }
+    .tag-alert { color: var(--red-core); font-weight: 700; }
+    .tag-tg { color: #29b6f6; }
+    .tag-poll { color: var(--amber-core); }
+    .tag-success { color: var(--emerald-core); font-weight: 700; }
+
+    /* Success / Ready State Overrides */
+    .state-online .ring-outer {
+      border-color: var(--emerald-core);
+      box-shadow: 0 0 25px var(--emerald-glow);
+    }
+    .state-online .gpu-core {
+      border-color: var(--emerald-core);
+      box-shadow: 0 0 30px var(--emerald-glow);
+      background: radial-gradient(circle, rgba(0, 232, 135, 0.35) 0%, rgba(7, 14, 24, 0.9) 80%);
+    }
+    .state-online .gpu-icon-svg {
+      fill: var(--emerald-core);
+      filter: drop-shadow(0 0 8px var(--emerald-core));
+    }
+    .state-online .primary-title {
+      color: var(--emerald-core);
+      text-shadow: 0 0 20px var(--emerald-glow);
+    }
+    .state-online .progress-bar-fill {
+      width: 100% !important;
+      left: 0 !important;
+      background: var(--emerald-core) !important;
+      animation: none !important;
+      box-shadow: 0 0 20px var(--emerald-glow);
+    }
+
+    /* Fallback / Manual Action Bar */
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .btn-action {
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid var(--cyan-core);
+      color: var(--cyan-core);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 1px;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: var(--cyan-core);
+      color: #03070d;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+
+    .btn-emerald {
+      border-color: var(--emerald-core);
+      color: var(--emerald-core);
+      background: rgba(0, 232, 135, 0.1);
+    }
+
+    .btn-emerald:hover {
+      background: var(--emerald-core);
+      color: #03070d;
+      box-shadow: 0 0 20px var(--emerald-glow);
+    }
+
+    /* Configuration Modal Drawer */
+    .config-trigger-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(7, 14, 24, 0.9);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .config-trigger-btn:hover {
+      color: var(--cyan-core);
+      border-color: var(--cyan-core);
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 11, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .config-box {
+      width: 100%;
+      max-width: 520px;
+      background: var(--bg-surface);
+      border: 1px solid var(--cyan-core);
+      border-radius: 8px;
+      padding: 28px;
+      box-shadow: 0 0 40px var(--cyan-glow);
+      font-family: var(--font-body);
+      text-align: left;
+    }
+
+    .config-box h3 {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: var(--text-highlight);
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    .config-box p {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+      line-height: 1.4;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    .input-group label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--cyan-core);
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .input-group input {
+      width: 100%;
+      background: #02060b;
+      border: 1px solid rgba(0, 212, 255, 0.25);
+      border-radius: 4px;
+      padding: 10px 14px;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      outline: none;
+    }
+
+    .input-group input:focus {
+      border-color: var(--cyan-core);
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    /* Footer */
+    footer {
+      position: relative;
+      z-index: 10;
+      padding: 16px 32px;
+      border-top: 1px solid rgba(0, 212, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      background: rgba(3, 7, 13, 0.9);
+    }
+
+    .footer-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ping-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan-core);
+      box-shadow: 0 0 8px var(--cyan-core);
+    }
+
+    @media (max-width: 768px) {
+      header { padding: 14px 18px; }
+      .security-badge { display: none; }
+      .standby-card { padding: 30px 18px; }
+      .primary-title { font-size: 1.15rem; }
+      .secondary-subtitle { font-size: 0.85rem; }
+      .specs-grid { grid-template-columns: 1fr; }
+      footer { flex-direction: column; gap: 8px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Decorative Cyber Canvas -->
+  <div class="bg-grid"></div>
+  <div class="bg-vignette"></div>
+  <div class="scanline"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand-cluster">
+      <div class="radar-icon"></div>
+      <div>
+        <div class="brand-title">IBVAP // DEFENSE SYSTEMS</div>
+        <div class="brand-sub">INTELLIGENT BORDER VIDEO ANALYTICS PLATFORM</div>
+      </div>
+    </div>
+    <div class="security-badge">
+      <div class="pulsing-amber-dot"></div>
+      <span>SECURE STANDBY // OPERATOR WAKE-SIGNAL ARMED</span>
+    </div>
+  </header>
+
+  <!-- Main Hero Card -->
+  <main>
+    <div class="standby-card" id="mainCard">
+      <!-- Sci-Fi Corner Brackets -->
+      <div class="corner-accent corner-tl"></div>
+      <div class="corner-accent corner-tr"></div>
+      <div class="corner-accent corner-bl"></div>
+      <div class="corner-accent corner-br"></div>
+
+      <!-- Orbital Scanner Hub -->
+      <div class="scanner-hub">
+        <div class="ring ring-outer"></div>
+        <div class="ring ring-mid"></div>
+        <div class="ring ring-inner"></div>
+        <div class="gpu-core" id="gpuCoreIcon">
+          <svg class="gpu-icon-svg" viewBox="0 0 24 24">
+            <path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm2 3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H6zm5 0a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1h-2zm5 0a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1h-2zM7 2v2H5v1h14V4h-2V2h-2v2h-2V2h-2v2H9V2H7zm0 18v2h2v-2h2v2h2v-2h2v2h2v-2h2v-1H5v1h2z"/>
+          </svg>
+          <div class="gpu-sub">RTX 4050</div>
+        </div>
+      </div>
+
+      <!-- Mandatory UI Labels -->
+      <h1 class="primary-title" id="statusTitle">
+        CONNECTING TO EDGE AI NODE (RTX 4050)...
+      </h1>
+      <p class="secondary-subtitle" id="statusSubtitle">
+        Node in low-power secure standby. Initializing encrypted GPU pipeline...
+      </p>
+
+      <!-- Hardware Telemetry Matrix -->
+      <div class="specs-grid">
+        <div class="spec-item">
+          <div class="spec-label">Target Hardware</div>
+          <div class="spec-val val-active">
+            <span>⚡</span> NVIDIA RTX 4050 (CUDA)
+          </div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-label">Edge Uplink State</div>
+          <div class="spec-val val-wake" id="uplinkState">
+            <span>📡</span> Awaiting Local Boot
+          </div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-label">Telegram Wake-Signal</div>
+          <div class="spec-val" id="telegramBadge">
+            <span>⏳</span> Dispatching...
+          </div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-label">Health Poll Target</div>
+          <div class="spec-val" id="healthDomainDisplay" title="/api/health">
+            <span>🛰️</span> Connecting...
+          </div>
+        </div>
+      </div>
+
+      <!-- Realtime Indeterminate Pipeline -->
+      <div class="progress-wrapper">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+      </div>
+
+      <!-- Realtime Terminal Log Readout -->
+      <div class="terminal-console" id="terminalConsole" aria-live="polite">
+        <!-- Lines dynamically inserted via JavaScript -->
+      </div>
+
+      <!-- Live Action Buttons -->
+      <div class="action-row" id="actionRow">
+        <button class="btn-action" id="btnResendTelegram" onclick="triggerTelegramWakeSignal(true)">
+          <span>🔔</span> Resend Operator Wake-Signal
+        </button>
+        <button class="btn-action" onclick="openConfigModal()">
+          <span>⚙️</span> Change Ngrok Domain
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Configuration Floating Trigger -->
+  <button class="config-trigger-btn" onclick="openConfigModal()">
+    <span>⚙️</span> Ngrok Endpoint Config
+  </button>
+
+  <!-- Ngrok Settings Modal -->
+  <div class="modal-overlay" id="configModal">
+    <div class="config-box">
+      <h3>EDGE NODE CONFIGURATION</h3>
+      <p>Configure your static Ngrok or tunneling URL to automatically monitor when your laptop's IBVAP backend comes online.</p>
+      
+      <div class="input-group">
+        <label for="ngrokInput">NGROK TUNNEL BASE DOMAIN</label>
+        <input type="text" id="ngrokInput" placeholder="https://your-static-domain.ngrok-free.app" />
+      </div>
+
+      <div class="input-group">
+        <label for="redirectInput">DASHBOARD REDIRECT TARGET</label>
+        <input type="text" id="redirectInput" placeholder="/frontend" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-action" onclick="closeConfigModal()">Cancel</button>
+        <button class="btn-action btn-emerald" onclick="saveNgrokConfig()">Save & Ping Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-status">
+      <div class="ping-pulse" id="pingPulse"></div>
+      <span id="pingTelemetry">AWAITING HANDSHAKE...</span>
+    </div>
+    <div>IBVAP TACTICAL EDGE PROTOTYPE // SECURE STANDBY DAEMON</div>
+  </footer>
+
+  <!-- Core JavaScript Pipeline -->
+  <script>
+    /* =========================================================================
+       IBVAP Vercel Standby Controller
+       =========================================================================
+       1. Sends Telegram wake notification immediately on page load
+       2. Continuously polls Ngrok edge health endpoint: /api/health
+       3. On 200 OK, automatically transitions UI and redirects to live dashboard
+       ========================================================================= */
+
+    // 1. NGTOK DOMAIN CONFIGURATION
+    // You can replace the default below, or update it via the UI / URL param (?ngrok=https://...)
+    const DEFAULT_NGROK_DOMAIN = "https://[INSERT_YOUR_NGROK_STATIC_DOMAIN_HERE]";
+    
+    // Telegram Bot Target Config (as instructed)
+    const TELEGRAM_ENDPOINT = "https://api.telegram.org/bot8805242238:AAEVKYJMVSu4r9-gIsufvS8MvkPtVLeoPfU/sendMessage";
+    const TELEGRAM_PAYLOAD = {
+      chat_id: "-5593775513",
+      text: "🚨 URGENT: An evaluator just opened the IBVAP link! Boot the local server immediately."
+    };
+
+    // Polling Intervals
+    const POLL_INTERVAL_MS = 2500; // ping every 2.5 seconds
+    let pollCount = 0;
+    let isNodeOnline = false;
+    let pollTimer = null;
+
+    // Helper: Resolve active Ngrok base URL (priority: URL param -> localStorage -> default constant)
+    function getActiveNgrokBase() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlParamDomain = urlParams.get('ngrok');
+      if (urlParamDomain && urlParamDomain.trim() !== "") {
+        return urlParamDomain.trim().replace(/\/+$/, '');
+      }
+
+      const storedDomain = localStorage.getItem("IBVAP_NGROK_DOMAIN");
+      if (storedDomain && storedDomain.trim() !== "") {
+        return storedDomain.trim().replace(/\/+$/, '');
+      }
+
+      return DEFAULT_NGROK_DOMAIN.replace(/\/+$/, '');
+    }
+
+    function getActiveRedirectPath() {
+      return localStorage.getItem("IBVAP_REDIRECT_PATH") || "/frontend";
+    }
+
+    // Terminal Logger UI Helper
+    const terminalEl = document.getElementById("terminalConsole");
+    function logTerminal(message, tagClass = "tag-sys") {
+      const line = document.createElement("div");
+      line.className = "terminal-line";
+      
+      const now = new Date();
+      const timeStr = now.toTimeString().split(" ")[0] + "." + String(now.getMilliseconds()).padStart(3, "0");
+      
+      line.innerHTML = `
+        <span class="timestamp">[${timeStr}]</span>
+        <span class="${tagClass}">${message}</span>
+      `;
+      terminalEl.appendChild(line);
+      terminalEl.scrollTop = terminalEl.scrollHeight;
+    }
+
+    // =========================================================================
+    // STEP 1: IMMEDIATELY SEND TELEGRAM NOTIFICATION ON PAGE LOAD
+    // =========================================================================
+    async function triggerTelegramWakeSignal(isManual = false) {
+      const badge = document.getElementById("telegramBadge");
+      
+      if (isManual) {
+        logTerminal("Manual operator wake-signal requested...", "tag-tg");
+      } else {
+        logTerminal("Evaluator visit detected. Dispatching encrypted wake-signal via Telegram Bot API...", "tag-tg");
+      }
+
+      try {
+        const response = await fetch(TELEGRAM_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(TELEGRAM_PAYLOAD)
+        });
+
+        if (response.ok) {
+          const resData = await response.json();
+          badge.innerHTML = `<span style="color:var(--emerald-core)">✔</span> Operator Notified`;
+          badge.classList.add("val-online");
+          logTerminal("Telegram wake-signal confirmed: Operator notified to boot RTX 4050 server.", "tag-success");
+        } else {
+          const errText = await response.text();
+          badge.innerHTML = `<span style="color:var(--amber-core)">⚠</span> HTTP ${response.status}`;
+          logTerminal(`Telegram Bot responded with HTTP ${response.status}. Retrying may be needed.`, "tag-alert");
+          console.warn("Telegram response:", response.status, errText);
+        }
+      } catch (err) {
+        badge.innerHTML = `<span style="color:var(--red-core)">✖</span> Network Error`;
+        logTerminal(`Telegram wake dispatch exception: ${err.message}`, "tag-alert");
+        console.error("Telegram error:", err);
+      }
+    }
+
+    // =========================================================================
+    // STEP 2: CONTINUOUS HEALTH POLLING (https://.../api/health)
+    // =========================================================================
+    async function pollEdgeHealth() {
+      if (isNodeOnline) return;
+
+      const baseDomain = getActiveNgrokBase();
+      const healthUrl = `${baseDomain}/api/health`;
+      pollCount++;
+
+      const isPlaceholder = baseDomain.includes("[INSERT_YOUR_NGROK_STATIC_DOMAIN_HERE]");
+      const pulseEl = document.getElementById("pingPulse");
+      const telemetryEl = document.getElementById("pingTelemetry");
+      const domainDisplay = document.getElementById("healthDomainDisplay");
+
+      // Short readable domain label for display
+      let domainLabel = baseDomain;
+      try {
+        domainLabel = new URL(baseDomain).host;
+      } catch (_) {}
+      domainDisplay.innerHTML = `<span>🛰️</span> ${domainLabel}`;
+
+      if (isPlaceholder) {
+        telemetryEl.textContent = `POLL #${pollCount} • DOMAIN NOT CONFIGURED • CLICK 'CHANGE NGROK DOMAIN'`;
+        pulseEl.style.background = "var(--amber-core)";
+        if (pollCount % 4 === 1) {
+          logTerminal(`Ngrok domain contains placeholder. Click 'Change Ngrok Domain' or configure DEFAULT_NGROK_DOMAIN in script.`, "tag-poll");
+        }
+        pollTimer = setTimeout(pollEdgeHealth, POLL_INTERVAL_MS);
+        return;
+      }
+
+      pulseEl.style.background = "var(--cyan-core)";
+      telemetryEl.textContent = `PINGING NODE (POLL #${pollCount})...`;
+
+      const startTime = performance.now();
+
+      try {
+        // ngrok-skip-browser-warning avoids free-tier ngrok interstitial pages
+        const response = await fetch(healthUrl, {
+          method: "GET",
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            "Accept": "application/json"
+          },
+          cache: "no-store"
+        });
+
+        const elapsedMs = Math.round(performance.now() - startTime);
+
+        if (response.status === 200) {
+          // ===================================================================
+          // STEP 3: 200 OK DETECTED -> TRANSITION & REDIRECT!
+          // ===================================================================
+          handleNodeOnline(baseDomain, elapsedMs);
+          return;
+        } else {
+          telemetryEl.textContent = `POLL #${pollCount} • HTTP ${response.status} • RETRYING IN 2.5s`;
+          pulseEl.style.background = "var(--amber-core)";
+          logTerminal(`Health probe #${pollCount} returned HTTP ${response.status} (${elapsedMs}ms). Awaiting node startup...`, "tag-poll");
+        }
+      } catch (err) {
+        const elapsedMs = Math.round(performance.now() - startTime);
+        telemetryEl.textContent = `POLL #${pollCount} • OFFLINE (${elapsedMs}ms) • RETRYING IN 2.5s`;
+        pulseEl.style.background = "var(--amber-core)";
+        
+        if (pollCount === 1 || pollCount % 5 === 0) {
+          logTerminal(`Health probe #${pollCount}: Node unreachable (${err.name}). Low-power standby active.`, "tag-poll");
+        }
+      }
+
+      // Schedule next continuous health poll
+      pollTimer = setTimeout(pollEdgeHealth, POLL_INTERVAL_MS);
+    }
+
+    // =========================================================================
+    // STEP 4: HARDWARE BOOT DETECTED -> REMOVE LOADING UI & REDIRECT
+    // =========================================================================
+    function handleNodeOnline(baseDomain, latencyMs) {
+      isNodeOnline = true;
+      clearTimeout(pollTimer);
+
+      const redirectPath = getActiveRedirectPath();
+      // Resolve clean target dashboard URL
+      const targetUrl = `${baseDomain}${redirectPath.startsWith('/') ? '' : '/'}${redirectPath}`;
+
+      logTerminal(`🚀 HTTP 200 OK RECEIVED (${latencyMs}ms)! EDGE AI NODE ONLINE!`, "tag-success");
+      logTerminal(`GPU Pipeline ready. Redirecting to Live Surveillance Dashboard: ${targetUrl}`, "tag-success");
+
+      // Visual state transition
+      const mainCard = document.getElementById("mainCard");
+      const statusTitle = document.getElementById("statusTitle");
+      const statusSubtitle = document.getElementById("statusSubtitle");
+      const uplinkState = document.getElementById("uplinkState");
+      const pulseEl = document.getElementById("pingPulse");
+      const telemetryEl = document.getElementById("pingTelemetry");
+      const actionRow = document.getElementById("actionRow");
+
+      mainCard.classList.add("state-online");
+      statusTitle.textContent = "EDGE AI NODE (RTX 4050) ONLINE!";
+      statusSubtitle.textContent = "Hardware boot verified. GPU pipeline initialized. Redirecting to live dashboard...";
+      
+      uplinkState.innerHTML = `<span>🟢</span> ACTIVE (CUDA:0)`;
+      uplinkState.className = "spec-val val-online";
+
+      pulseEl.style.background = "var(--emerald-core)";
+      telemetryEl.textContent = `NODE ONLINE • 200 OK (${latencyMs}ms) • REDIRECTING...`;
+
+      // Provide immediate launch action button as fail-safe
+      actionRow.innerHTML = `
+        <a href="${targetUrl}" class="btn-action btn-emerald" style="font-size:0.92rem; padding: 12px 28px;">
+          <span>⚡</span> ENTER LIVE DASHBOARD NOW
+        </a>
+      `;
+
+      // Countdown & Redirect
+      let countdown = 2;
+      const redirectInterval = setInterval(() => {
+        if (countdown <= 0) {
+          clearInterval(redirectInterval);
+          window.location.href = targetUrl;
+        } else {
+          statusSubtitle.textContent = `Hardware boot verified. Redirecting in ${countdown} second${countdown > 1 ? 's' : ''}...`;
+          countdown--;
+        }
+      }, 1000);
+    }
+
+    // =========================================================================
+    // MODAL CONFIGURATION LOGIC (User-Friendly Ngrok Domain Setting)
+    // =========================================================================
+    function openConfigModal() {
+      const modal = document.getElementById("configModal");
+      const ngrokInput = document.getElementById("ngrokInput");
+      const redirectInput = document.getElementById("redirectInput");
+
+      const activeDomain = getActiveNgrokBase();
+      ngrokInput.value = activeDomain.includes("[INSERT_YOUR_NGROK_STATIC_DOMAIN_HERE]") ? "" : activeDomain;
+      redirectInput.value = getActiveRedirectPath();
+      modal.classList.add("active");
+    }
+
+    function closeConfigModal() {
+      document.getElementById("configModal").classList.remove("active");
+    }
+
+    function saveNgrokConfig() {
+      const ngrokInput = document.getElementById("ngrokInput");
+      const redirectInput = document.getElementById("redirectInput");
+      
+      const domainVal = ngrokInput.value.trim();
+      const redirectVal = redirectInput.value.trim() || "/frontend";
+
+      if (domainVal) {
+        localStorage.setItem("IBVAP_NGROK_DOMAIN", domainVal);
+        logTerminal(`Ngrok domain updated to: ${domainVal}`, "tag-sys");
+      }
+      localStorage.setItem("IBVAP_REDIRECT_PATH", redirectVal);
+
+      closeConfigModal();
+
+      // Reset poll counter & ping immediately
+      pollCount = 0;
+      clearTimeout(pollTimer);
+      pollEdgeHealth();
+    }
+
+    // =========================================================================
+    // INITIALIZATION ON PAGE LOAD
+    // =========================================================================
+    window.addEventListener("DOMContentLoaded", () => {
+      logTerminal("IBVAP Vercel Standby Gateway initialized.", "tag-sys");
+
+      // 1. Send Telegram Notification immediately as requested
+      triggerTelegramWakeSignal(false);
+
+      // 2. Start continuous health polling
+      pollEdgeHealth();
+    });
+  </script>
+</body>
+</html>
