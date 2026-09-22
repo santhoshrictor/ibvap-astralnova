@@ -836,9 +836,9 @@
        3. On 200 OK, automatically transitions UI and redirects to live dashboard
        ========================================================================= */
 
-    // 1. NGTOK DOMAIN CONFIGURATION
-    // You can replace the default below, or update it via the UI / URL param (?ngrok=https://...)
-    const DEFAULT_NGROK_DOMAIN = "https://[INSERT_YOUR_NGROK_STATIC_DOMAIN_HERE]";
+    // 1. NGROK DOMAIN CONFIGURATION
+    // Set your active Ngrok domain below, or update via URL (?ngrok=https://...) or config modal
+    const DEFAULT_NGROK_DOMAIN = "https://[INSERT_YOUR_NEW_NGROK_DOMAIN_HERE]";
     
     // Telegram Bot Target Config (as instructed)
     const TELEGRAM_ENDPOINT = "https://api.telegram.org/bot8805242238:AAEVKYJMVSu4r9-gIsufvS8MvkPtVLeoPfU/sendMessage";
@@ -867,10 +867,6 @@
       }
 
       return DEFAULT_NGROK_DOMAIN.replace(/\/+$/, '');
-    }
-
-    function getActiveRedirectPath() {
-      return localStorage.getItem("IBVAP_REDIRECT_PATH") || "/frontend";
     }
 
     // Terminal Logger UI Helper
@@ -939,7 +935,7 @@
       const healthUrl = `${baseDomain}/api/health`;
       pollCount++;
 
-      const isPlaceholder = baseDomain.includes("[INSERT_YOUR_NGROK_STATIC_DOMAIN_HERE]");
+      const isPlaceholder = baseDomain.includes("[INSERT_YOUR_NEW_NGROK_DOMAIN_HERE]") || baseDomain.includes("[INSERT_YOUR_NGROK_STATIC_DOMAIN_HERE]");
       const pulseEl = document.getElementById("pingPulse");
       const telemetryEl = document.getElementById("pingTelemetry");
       const domainDisplay = document.getElementById("healthDomainDisplay");
@@ -981,7 +977,7 @@
 
         if (response.status === 200) {
           // ===================================================================
-          // STEP 3: 200 OK DETECTED -> TRANSITION & REDIRECT!
+          // STEP 3: 200 OK DETECTED -> HIDE STANDBY UI & REDIRECT IMMEDIATELY!
           // ===================================================================
           handleNodeOnline(baseDomain, elapsedMs);
           return;
@@ -1005,56 +1001,57 @@
     }
 
     // =========================================================================
-    // STEP 4: HARDWARE BOOT DETECTED -> REMOVE LOADING UI & REDIRECT
+    // STEP 4: HARDWARE BOOT DETECTED (200 OK) -> HIDE STANDBY UI & REDIRECT
     // =========================================================================
     function handleNodeOnline(baseDomain, latencyMs) {
       isNodeOnline = true;
       clearTimeout(pollTimer);
 
-      const redirectPath = getActiveRedirectPath();
-      // Resolve clean target dashboard URL
-      const targetUrl = `${baseDomain}${redirectPath.startsWith('/') ? '' : '/'}${redirectPath}`;
+      const targetUrl = baseDomain;
 
       logTerminal(`🚀 HTTP 200 OK RECEIVED (${latencyMs}ms)! EDGE AI NODE ONLINE!`, "tag-success");
-      logTerminal(`GPU Pipeline ready. Redirecting to Live Surveillance Dashboard: ${targetUrl}`, "tag-success");
+      logTerminal(`Redirecting evaluator browser to live node: ${targetUrl}`, "tag-success");
 
-      // Visual state transition
+      // 1. Automatically hide the Edge AI Node Standby UI
       const mainCard = document.getElementById("mainCard");
-      const statusTitle = document.getElementById("statusTitle");
-      const statusSubtitle = document.getElementById("statusSubtitle");
-      const uplinkState = document.getElementById("uplinkState");
-      const pulseEl = document.getElementById("pingPulse");
-      const telemetryEl = document.getElementById("pingTelemetry");
-      const actionRow = document.getElementById("actionRow");
+      if (mainCard) {
+        mainCard.style.display = "none";
+      }
 
-      mainCard.classList.add("state-online");
-      statusTitle.textContent = "EDGE AI NODE (RTX 4050) ONLINE!";
-      statusSubtitle.textContent = "Hardware boot verified. GPU pipeline initialized. Redirecting to live dashboard...";
-      
-      uplinkState.innerHTML = `<span>🟢</span> ACTIVE (CUDA:0)`;
-      uplinkState.className = "spec-val val-online";
-
-      pulseEl.style.background = "var(--emerald-core)";
-      telemetryEl.textContent = `NODE ONLINE • 200 OK (${latencyMs}ms) • REDIRECTING...`;
-
-      // Provide immediate launch action button as fail-safe
-      actionRow.innerHTML = `
-        <a href="${targetUrl}" class="btn-action btn-emerald" style="font-size:0.92rem; padding: 12px 28px;">
-          <span>⚡</span> ENTER LIVE DASHBOARD NOW
-        </a>
+      // 2. Display immediate high-speed redirect transition
+      const redirectNotice = document.createElement("div");
+      redirectNotice.id = "redirectNotice";
+      redirectNotice.style.cssText = `
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #03070d;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-family: 'Orbitron', monospace;
+        color: #00e887;
+        gap: 16px;
       `;
+      redirectNotice.innerHTML = `
+        <div style="font-size: 1.8rem; font-weight: 800; text-shadow: 0 0 20px rgba(0, 232, 135, 0.6);">
+          EDGE AI NODE ONLINE (200 OK)
+        </div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #00d4ff;">
+          Redirecting to Live Surveillance Platform...
+        </div>
+        <div style="margin-top: 10px;">
+          <a href="${targetUrl}" style="color: #00e887; font-family: monospace; font-size: 0.85rem; text-decoration: underline;">
+            Click here if not redirected automatically (${targetUrl})
+          </a>
+        </div>
+      `;
+      document.body.appendChild(redirectNotice);
 
-      // Countdown & Redirect
-      let countdown = 2;
-      const redirectInterval = setInterval(() => {
-        if (countdown <= 0) {
-          clearInterval(redirectInterval);
-          window.location.href = targetUrl;
-        } else {
-          statusSubtitle.textContent = `Hardware boot verified. Redirecting in ${countdown} second${countdown > 1 ? 's' : ''}...`;
-          countdown--;
-        }
-      }, 1000);
+      // 3. Immediately redirect the evaluator's browser to the live Ngrok domain
+      window.location.href = targetUrl;
     }
 
     // =========================================================================

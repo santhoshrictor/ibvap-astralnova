@@ -1261,8 +1261,22 @@ app.add_middleware(
 # CORE API ENDPOINTS
 # =============================================================================
 
-@app.get("/", tags=["System"])
-async def root():
+@app.get("/", response_class=HTMLResponse, tags=["Frontend"])
+@app.get("/frontend", response_class=HTMLResponse, tags=["Frontend"])
+async def frontend_dashboard():
+    """Serve the 3-Camera IBVAP Surveillance Command Center frontend."""
+    template_path = os.path.join(BASE_DIR, "templates", "index.html")
+    if os.path.exists(template_path):
+        with open(template_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(
+        content="<h2>IBVAP Frontend template not found. Please ensure templates/index.html exists.</h2>",
+        status_code=404
+    )
+
+
+@app.get("/api/meta", tags=["System"])
+async def system_metadata():
     """System metadata and active GPU verification."""
     engine: IBVAPSurveillanceEngine = getattr(app.state, "engine", None)
     cuda_available = torch.cuda.is_available()
@@ -1277,32 +1291,8 @@ async def root():
         "device_name": device_name,
         "cuda_available": cuda_available,
         "torch_version": torch.__version__,
-        "documentation": "/docs",
-        "endpoints": {
-            "root": "/",
-            "frontend": "/frontend",
-            "telemetry": "/api/telemetry",
-            "camera_1_stream": "/api/stream/video/1",
-            "camera_2_stream": "/api/stream/video/2",
-            "camera_3_stream": "/api/stream/video/3",
-            "mosaic_stream": "/api/stream/video/mosaic",
-            "video_sources": "/api/video-sources",
-            "models_registry": "/api/models"
-        }
+        "documentation": "/docs"
     }
-
-
-@app.get("/frontend", response_class=HTMLResponse, tags=["Frontend"])
-async def frontend_dashboard():
-    """Serve the 3-Camera IBVAP Surveillance Command Center frontend."""
-    template_path = os.path.join(BASE_DIR, "templates", "index.html")
-    if os.path.exists(template_path):
-        with open(template_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(
-        content="<h2>IBVAP Frontend template not found. Please ensure templates/index.html exists.</h2>",
-        status_code=404
-    )
 
 
 @app.get("/api/telemetry", tags=["Telemetry"])
@@ -1382,15 +1372,8 @@ async def get_system_status():
 
 @app.get("/api/health", tags=["System"])
 async def health_check():
-    """Lightweight edge health check endpoint for Vercel standby frontend polling."""
-    engine = getattr(app.state, "engine", None)
-    return {
-        "status": "online",
-        "healthy": True,
-        "node": "EDGE_AI_NODE_01",
-        "device": getattr(engine, "device_name", "NVIDIA GeForce RTX 4050 (CUDA)"),
-        "timestamp": time.time()
-    }
+    """Health check endpoint for Vercel standby frontend handshake."""
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
